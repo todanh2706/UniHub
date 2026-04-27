@@ -2,22 +2,22 @@
 
 ## Bảng phân công (Task List)
 
-| Task ID | Tên công việc                                        | Assignee | Trạng thái |
-| :------ | :--------------------------------------------------- | :------- | :--------- |
-| **T01** | Thiết kế Kiến trúc tổng thể & C4 Diagram             | Danh     | TODO       |
-| **T02** | Thiết kế Database & Dữ liệu                          | Khoa     | TODO       |
-| **T03** | Thiết kế Phân quyền (RBAC) & Luồng nghiệp vụ         | Danh     | TODO       |
-| **T04** | Thiết kế Cơ chế bảo vệ hệ thống                      | Khoa     | TODO       |
-| **T05** | Khởi tạo Project & Dữ liệu mẫu (Seed Data)           | Khoa     | TODO       |
-| **T06** | Cài đặt Quản trị Workshop & Authentication           | Danh     | TODO       |
-| **T07** | Cài đặt API Đăng ký & Xử lý Tranh chấp chỗ           | Khoa     | TODO       |
-| **T08** | Cài đặt Check-in Offline (Mobile/Web)                | Danh     | TODO       |
-| **T09** | Cài đặt tính năng AI Summary                         | Khoa     | TODO       |
-| **T10** | Cài đặt Đồng bộ dữ liệu CSV                          | Khoa     | TODO       |
-| **T11** | Cài đặt hệ thống Thông báo                           | Danh     | TODO       |
-| **T12** | Cài đặt Rate Limiting, Circuit Breaker & Idempotency | Khoa     | TODO       |
-| **T13** | Quay Video trình bày & Demo                          | Danh     | TODO       |
-| **T14** | Hoàn thiện Blueprint & Đóng gói nộp bài              | Danh     | TODO       |
+| Task ID | Tên công việc                                        | Assignee |
+| :------ | :--------------------------------------------------- | :------- |
+| **T01** | Thiết kế Kiến trúc tổng thể & C4 Diagram             | Danh     |
+| **T02** | Thiết kế Database & Dữ liệu                          | Khoa     |
+| **T03** | Thiết kế Phân quyền (RBAC) & Luồng nghiệp vụ         | Danh     |
+| **T04** | Thiết kế Cơ chế bảo vệ hệ thống                      | Khoa     |
+| **T05** | Khởi tạo Project & Dữ liệu mẫu (Seed Data)           | Khoa     |
+| **T06** | Cài đặt Quản trị Workshop & Authentication           | Danh     |
+| **T07** | Cài đặt API Đăng ký & Xử lý Tranh chấp chỗ           | Khoa     |
+| **T08** | Cài đặt Check-in Offline (Mobile/Web)                | Danh     |
+| **T09** | Cài đặt tính năng AI Summary                         | Khoa     |
+| **T10** | Cài đặt Đồng bộ dữ liệu CSV                          | Khoa     |
+| **T11** | Cài đặt hệ thống Thông báo                           | Danh     |
+| **T12** | Cài đặt Rate Limiting, Circuit Breaker & Idempotency | Khoa     |
+| **T13** | Quay Video trình bày & Demo                          | Danh     |
+| **T14** | Hoàn thiện Blueprint & Đóng gói nộp bài              | Danh     |
 
 ---
 
