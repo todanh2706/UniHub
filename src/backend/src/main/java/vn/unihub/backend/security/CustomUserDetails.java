@@ -11,6 +11,11 @@ public class CustomUserDetails implements UserDetails {
     private final User user;
     private final Collection<? extends GrantedAuthority> authorities;
 
+    public CustomUserDetails(User user) {
+        this.user = user;
+        this.authorities = java.util.Collections.emptyList();
+    }
+
     public CustomUserDetails(User user, Collection<? extends GrantedAuthority> authorities) {
         this.user = user;
         this.authorities = authorities;

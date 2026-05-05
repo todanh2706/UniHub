@@ -42,6 +42,18 @@ public class DataSeeder {
                         .build();
                 roleRepository.save(rAdmin);
 
+                Role rStudent = Role.builder()
+                        .code("STUDENT")
+                        .name("Sinh viên")
+                        .build();
+                roleRepository.save(rStudent);
+
+                Role rLecturer = Role.builder()
+                        .code("LECTURER")
+                        .name("Giảng viên")
+                        .build();
+                roleRepository.save(rLecturer);
+
                 // Gắn Permission cho Role (Vì chưa có Repository riêng cho RolePermission nên tạm dùng logic này hoặc viết native SQL)
                 // Tuy nhiên do chưa có RolePermissionRepository, ở đây tôi tạo tạm User cho việc test RBAC.
                 
