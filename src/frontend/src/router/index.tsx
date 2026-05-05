@@ -2,12 +2,15 @@ import { createBrowserRouter } from 'react-router-dom';
 
 import StudentLayout from '../pages/student/Layout';
 import StudentHome from '../pages/student/Home';
+import WorkshopDetails from '../pages/student/WorkshopDetails';
 
 import AdminLayout from '../pages/admin/Layout';
 import AdminDashboard from '../pages/admin/Dashboard';
 
 import CheckinLayout from '../pages/checkin/Layout';
 import CheckinPortal from '../pages/checkin/CheckinPortal';
+import LoginPage from '../pages/auth/LoginPage';
+import SignUpPage from '../pages/auth/SignUpPage';
 
 export const router = createBrowserRouter([
   {
@@ -17,6 +20,10 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <StudentHome />
+      },
+      {
+        path: 'workshops/:id',
+        element: <WorkshopDetails />
       }
     ]
   },
@@ -39,5 +46,13 @@ export const router = createBrowserRouter([
         element: <CheckinPortal />
       }
     ]
+  },
+  {
+    path: '/login',
+    element: <LoginPage />
+  },
+  {
+    path: '/signup',
+    element: <SignUpPage />
   }
 ]);
