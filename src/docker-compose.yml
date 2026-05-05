@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres
+    image: postgres:16
     container_name: unihub-prim-db
     env_file:
       - .env
@@ -10,35 +8,65 @@ services:
       - "5432:5432"
     volumes:
       - db:/var/lib/postgresql/data
-      - ./database/01_init_schema.sql:/docker-entrypoint-initdb.d/01_init_schema.sql
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -d unihub_db -U unihub" ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 30s
       timeout: 10s
       retries: 5
+    networks:
+      - app
+
+  redis:
+    image: redis:8-alpine
+    container_name: unihub-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - app
 
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     container_name: unihub-backend
-    env_file:
-      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      - DB_HOST=postgres
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SERVER_PORT: 8080
     ports:
       - "8080:8080"
-    depends_on:
-      - postgres
-    volumes:
-      - ./backend/src:/app/src
-      - maven-repo:/root/.m2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - app
 
 networks:
-  db:
+  app:
     driver: bridge
 
 volumes:
   db:
-  maven-repo:
+  redis:

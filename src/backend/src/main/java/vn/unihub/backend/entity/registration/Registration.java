@@ -12,7 +12,13 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "registrations")
+@Table(
+        name = "registrations",
+        indexes = {
+                @Index(name = "idx_reg_workshop_status_expires", columnList = "workshop_id,status,expires_at"),
+                @Index(name = "idx_reg_status_expires", columnList = "status,expires_at")
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor

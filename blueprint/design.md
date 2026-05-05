@@ -427,7 +427,7 @@ Tách document và summary giúp hệ thống retry extract hoặc retry AI mà 
 | ------------------------ | ------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `audit_logs`             | `id`, `actor_user_id`, `action`, `resource_type`, `resource_id`, `metadata`, `ip_address`, `created_at` | Lưu vết thao tác nhạy cảm                     |
 | `workshop_change_logs`   | `id`, `workshop_id`, `field_name`, `old_value`, `new_value`, `changed_by`, `reason`, `changed_at`       | Lưu lịch sử đổi phòng, đổi giờ, hủy workshop  |
-| `rate_limit_policies`    | `id`, `scope`, `endpoint`, `role_code`, `limit`, `window_seconds`, `algorithm`, `enabled`               | Lưu cấu hình rate limit nếu cần thay đổi động |
+| `rate_limit_policies`    | `id`, `scope`, `endpoint`, `role_code`, `limit_value`, `window_seconds`, `algorithm`, `enabled`         | Lưu cấu hình rate limit nếu cần thay đổi động |
 | `circuit_breaker_events` | `id`, `service_name`, `from_state`, `to_state`, `reason`, `failure_count`, `created_at`                 | Audit trạng thái circuit breaker              |
 
 Runtime rate limit và circuit breaker state lưu trong Redis. PostgreSQL chỉ lưu policy và event log để phục vụ audit/demo.

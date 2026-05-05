@@ -6,6 +6,53 @@ UniHub Workshop là giải pháp toàn diện nhằm số hóa quy trình tổ c
 
 Dự án tập trung giải quyết các thách thức kỹ thuật lớn như: xử lý tải trọng đột biến (High Traffic), tranh chấp tài nguyên (Race Condition), và đảm bảo hoạt động liên tục trong điều kiện mạng không ổn định (Offline-First).
 
+## Quick Start (T05)
+
+### Yêu cầu
+
+- Docker + Docker Compose
+- Go (để chạy script generate CSV)
+
+### 1) Khởi động full demo stack (PostgreSQL + Redis + Backend)
+
+```bash
+cp src/.env.example src/.env
+docker compose -f src/docker-compose.yml up --build -d
+```
+
+### 2) Kiểm tra backend health
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+Khi backend healthy, Flyway đã tự động chạy các migration:
+
+- `V1__init_schema.sql`: tạo schema + index + constraint
+- `V2__seed_demo_data.sql`: seed dữ liệu demo
+
+### 3) Tạo CSV giả lập dữ liệu sinh viên
+
+```bash
+# Tạo file 500 dòng (mẫu đã commit sẵn)
+go run data/generate_students_csv.go -rows 500 -out data/sample_students_500.csv
+
+# Tạo file 12.000 dòng để test tải import
+go run data/generate_students_csv.go -rows 12000 -out data/students_12000.csv
+```
+
+### 4) Dừng demo stack
+
+```bash
+docker compose -f src/docker-compose.yml down
+```
+
+### Tài khoản demo seed sẵn
+
+- Student: `student1@unihub.local` / `secret`
+- Organizer: `organizer@unihub.local` / `secret`
+- Check-in Staff: `checkin@unihub.local` / `secret`
+
 ## Các tính năng chính
 
 ### 1. Đăng ký và Quản lý Workshop

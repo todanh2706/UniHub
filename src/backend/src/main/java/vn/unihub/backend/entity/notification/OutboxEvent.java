@@ -9,7 +9,12 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "outbox_events")
+@Table(
+        name = "outbox_events",
+        indexes = {
+                @Index(name = "idx_outbox_status_available", columnList = "status,available_at")
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
