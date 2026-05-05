@@ -6,16 +6,34 @@ services:
     container_name: unihub-prim-db
     env_file:
       - .env
-    ports: 
+    ports:
       - "5432:5432"
     volumes:
-      - db:/data/postgres
+      - db:/var/lib/postgresql/data
+      - ./database/01_init_schema.sql:/docker-entrypoint-initdb.d/01_init_schema.sql
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -d postgres -U postgres" ]
+      test: [ "CMD-SHELL", "pg_isready -d unihub_db -U unihub" ]
       interval: 30s
       timeout: 10s
       retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: unihub-backend
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=postgres
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend/src:/app/src
+      - maven-repo:/root/.m2
 
 networks:
   db:
@@ -23,3 +41,4 @@ networks:
 
 volumes:
   db:
+  maven-repo:
