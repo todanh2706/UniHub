@@ -1,33 +1,94 @@
-HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+# ==========================================
+# THƯ MỤC & FILE CẤU HÌNH HỆ THỐNG / MÔI TRƯỜNG
+# ==========================================
+.env
+.env.*
+!.env.example
+!.env.template
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
+# ==========================================
+# IDE & EDITOR
+# ==========================================
+.idea/
+.vscode/
+*.swp
+*.swo
 .project
-.settings
-.springBeans
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
 .sts4-cache
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
+# ==========================================
+# HỆ ĐIỀU HÀNH
+# ==========================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+# ==========================================
+# BACKEND (Java / Spring Boot / Maven)
+# ==========================================
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Bỏ qua các file build/logs
+*.log
+logs/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+
+# ==========================================
+# FRONTEND (Node.js / React / Next.js / Vue)
+# ==========================================
+node_modules/
+dist/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
+.next/
+out/
+.nuxt/
+.vuepress/dist/
+.serverless/
+.npm/
 
-### VS Code ###
-.vscode/
+# NPM/Yarn/Pnpm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================================
+# DATABASE & DATA VOLUMES (Nếu có chạy Docker mount local)
+# ==========================================
+data/
+db-data/
+pgdata/
+uploads/
+*.sqlite
+*.sqlite3
+*.db
+
+# ==========================================
+# TEST & COVERAGE
+# ==========================================
+coverage/
+.nyc_output/
+*.lcov
+.cypress/
