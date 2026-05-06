@@ -67,15 +67,22 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: unihub-frontend
     ports:
-      - "3000:80"
+      - "3000:5173"
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - CI=false
+    tty: true
+    stdin_open: true
 
 networks:
   app:

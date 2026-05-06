@@ -27,9 +27,9 @@ const SignUpPage: React.FC = () => {
     try {
       const response = await api.post('/auth/register', formData);
       const { token, refreshToken, email, firstName, lastName } = response.data;
-      
+
       setAuth({ email, firstName, lastName }, token, refreshToken);
-      navigate('/student/dashboard');
+      navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create account');
     } finally {

@@ -33,4 +33,14 @@ export default defineConfig({
       }
     })
   ],
+  server: {
+    host: true,
+    port: 5173,
+    watch: {
+      usePolling: true,
+    },
+    hmr: {
+      clientPort: 3000, // Matching the mapped port in docker-compose
+    },
+  },
 })
