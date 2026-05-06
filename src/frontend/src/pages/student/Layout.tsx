@@ -1,9 +1,11 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Search, Bell } from 'lucide-react';
+import { Search, Bell, User } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 
 
 const StudentLayout = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
 
   return (
     <div className="app-layout" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -103,13 +105,36 @@ const StudentLayout = () => {
                 }}></span>
               </button>
               <div style={{ width: '1px', height: '24px', background: 'var(--neutral-200)', margin: '0 8px' }}></div>
-              <button 
-                onClick={() => navigate('/login')}
-                className="btn btn-primary" 
-                style={{ padding: '8px 20px', fontSize: '14px' }}
-              >
-                Sign In
-              </button>
+              {isAuthenticated ? (
+                <button 
+                  onClick={() => navigate('/profile')}
+                  style={{ 
+                    background: 'var(--neutral-100)', 
+                    border: 'none', 
+                    width: '40px', 
+                    height: '40px', 
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--primary-color)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'var(--neutral-200)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'var(--neutral-100)'}
+                >
+                  <User size={20} />
+                </button>
+              ) : (
+                <button 
+                  onClick={() => navigate('/login')}
+                  className="btn btn-primary" 
+                  style={{ padding: '8px 20px', fontSize: '14px' }}
+                >
+                  Sign In
+                </button>
+              )}
             </div>
           </nav>
         </div>

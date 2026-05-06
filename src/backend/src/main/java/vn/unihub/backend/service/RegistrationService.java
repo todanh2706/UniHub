@@ -178,6 +178,23 @@ public class RegistrationService {
                 .map(this::toRegistrationResponse);
     }
 
+    @Transactional
+    public RegistrationResponse updateRegistrationStatus(UUID registrationId, String newStatus, User currentUser) {
+        Registration registration = registrationRepository.findById(registrationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Registration not found"));
+
+        registration.setStatus(newStatus.toUpperCase());
+        if ("CANCELLED".equalsIgnoreCase(newStatus)) {
+            registration.setCancelledAt(Instant.now());
+            registration.setCancelledBy(currentUser);
+        } else if ("CONFIRMED".equalsIgnoreCase(newStatus)) {
+            registration.setConfirmedAt(Instant.now());
+        }
+        
+        Registration saved = registrationRepository.save(registration);
+        return toRegistrationResponse(saved);
+    }
+
     @Transactional(readOnly = true)
     public OrganizerRegistrationSummaryResponse getWorkshopRegistrationSummary(UUID workshopId) {
         Workshop workshop = workshopRepository.findById(workshopId)

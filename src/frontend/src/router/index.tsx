@@ -9,6 +9,10 @@ import AdminDashboard from '../pages/admin/Dashboard';
 
 import CheckinLayout from '../pages/checkin/Layout';
 import CheckinPortal from '../pages/checkin/CheckinPortal';
+import OrganizerLayout from '../pages/organizer/Layout';
+import OrganizerDashboard from '../pages/organizer/Dashboard';
+import WorkshopForm from '../pages/organizer/WorkshopForm';
+import RegistrationList from '../pages/organizer/RegistrationList';
 import LoginPage from '../pages/auth/LoginPage';
 import SignUpPage from '../pages/auth/SignUpPage';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -16,24 +20,33 @@ import ProtectedRoute from '../components/ProtectedRoute';
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <ProtectedRoute />,
+    element: <StudentLayout />,
     children: [
       {
-        path: '',
-        element: <StudentLayout />,
+        index: true,
+        element: <StudentHome />
+      },
+      {
+        path: 'workshops/:id',
+        element: <WorkshopDetails />
+      },
+      {
+        path: 'my-registrations',
+        element: <ProtectedRoute />,
         children: [
           {
             index: true,
-            element: <StudentHome />
-          },
-          {
-            path: 'workshops/:id',
-            element: <WorkshopDetails />
+            element: <div>My Registrations Page</div>
           }
         ]
-      },
+      }
+    ]
+  },
+  {
+    path: '/admin',
+    element: <ProtectedRoute />,
+    children: [
       {
-        path: 'admin',
         element: <AdminLayout />,
         children: [
           {
@@ -41,14 +54,46 @@ export const router = createBrowserRouter([
             element: <AdminDashboard />
           }
         ]
-      },
+      }
+    ]
+  },
+  {
+    path: '/checkin',
+    element: <ProtectedRoute />,
+    children: [
       {
-        path: 'checkin',
         element: <CheckinLayout />,
         children: [
           {
             index: true,
             element: <CheckinPortal />
+          }
+        ]
+      }
+    ]
+  },
+  {
+    path: '/organizer',
+    element: <ProtectedRoute />,
+    children: [
+      {
+        element: <OrganizerLayout />,
+        children: [
+          {
+            index: true,
+            element: <OrganizerDashboard />
+          },
+          {
+            path: 'workshops/new',
+            element: <WorkshopForm />
+          },
+          {
+            path: 'workshops/:id/edit',
+            element: <WorkshopForm />
+          },
+          {
+            path: 'workshops/:id/registrations',
+            element: <RegistrationList />
           }
         ]
       }
