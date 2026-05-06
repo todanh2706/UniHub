@@ -58,6 +58,16 @@
   font-size: 16px;
 }
 
+.error-message {
+  background: #FEF2F2;
+  color: #DC2626;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  margin-top: 16px;
+  border: 1px solid #FCA5A5;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;

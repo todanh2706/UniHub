@@ -1,26 +1,40 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, UserPlus, Loader2, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, UserPlus, Loader2, ArrowLeft } from 'lucide-react';
 import { FaGithub, FaGoogle } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '../../api/axios';
+import { useAuthStore } from '../../store/authStore';
 import './LoginPage.css'; // Reusing login styles for consistency
 
 const SignUpPage: React.FC = () => {
+  const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    fullName: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
-    confirmPassword: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsLoading(false);
-    console.log('Sign up attempt with:', formData);
+    setError(null);
+
+    try {
+      const response = await api.post('/auth/register', formData);
+      const { token, refreshToken, email, firstName, lastName } = response.data;
+      
+      setAuth({ email, firstName, lastName }, token, refreshToken);
+      navigate('/student/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to create account');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,23 +69,43 @@ const SignUpPage: React.FC = () => {
           </div>
           <h1>Create Account</h1>
           <p>Join UniHub to start managing your workshops</p>
+          {error && <div className="error-message">{error}</div>}
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
-          <div className="input-group">
-            <label htmlFor="fullName">Full Name</label>
-            <div className="input-wrapper">
-              <User className="input-icon" size={20} />
-              <input
-                type="text"
-                id="fullName"
-                name="fullName"
-                placeholder="John Doe"
-                required
-                value={formData.fullName}
-                onChange={handleChange}
-                disabled={isLoading}
-              />
+          <div className="input-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="input-group">
+              <label htmlFor="firstName">First Name</label>
+              <div className="input-wrapper">
+                <UserIcon className="input-icon" size={20} />
+                <input
+                  type="text"
+                  id="firstName"
+                  name="firstName"
+                  placeholder="John"
+                  required
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="lastName">Last Name</label>
+              <div className="input-wrapper">
+                <UserIcon className="input-icon" size={20} />
+                <input
+                  type="text"
+                  id="lastName"
+                  name="lastName"
+                  placeholder="Doe"
+                  required
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
+              </div>
             </div>
           </div>
 

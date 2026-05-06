@@ -11,39 +11,46 @@ import CheckinLayout from '../pages/checkin/Layout';
 import CheckinPortal from '../pages/checkin/CheckinPortal';
 import LoginPage from '../pages/auth/LoginPage';
 import SignUpPage from '../pages/auth/SignUpPage';
+import ProtectedRoute from '../components/ProtectedRoute';
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <StudentLayout />,
+    element: <ProtectedRoute />,
     children: [
       {
-        index: true,
-        element: <StudentHome />
+        path: '',
+        element: <StudentLayout />,
+        children: [
+          {
+            index: true,
+            element: <StudentHome />
+          },
+          {
+            path: 'workshops/:id',
+            element: <WorkshopDetails />
+          }
+        ]
       },
       {
-        path: 'workshops/:id',
-        element: <WorkshopDetails />
-      }
-    ]
-  },
-  {
-    path: '/admin',
-    element: <AdminLayout />,
-    children: [
+        path: 'admin',
+        element: <AdminLayout />,
+        children: [
+          {
+            index: true,
+            element: <AdminDashboard />
+          }
+        ]
+      },
       {
-        index: true,
-        element: <AdminDashboard />
-      }
-    ]
-  },
-  {
-    path: '/checkin',
-    element: <CheckinLayout />,
-    children: [
-      {
-        index: true,
-        element: <CheckinPortal />
+        path: 'checkin',
+        element: <CheckinLayout />,
+        children: [
+          {
+            index: true,
+            element: <CheckinPortal />
+          }
+        ]
       }
     ]
   },

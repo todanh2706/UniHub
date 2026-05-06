@@ -2,11 +2,16 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn, Loader2 } from 'lucide-react';
 import { FaGithub, FaGoogle } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '../../api/axios';
+import { useAuthStore } from '../../store/authStore';
 import './LoginPage.css';
 
 const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -15,10 +20,19 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsLoading(false);
-    console.log('Login attempt with:', formData);
+    setError(null);
+
+    try {
+      const response = await api.post('/auth/login', formData);
+      const { token, refreshToken, email, firstName, lastName } = response.data;
+
+      setAuth({ email, firstName, lastName }, token, refreshToken);
+      navigate('/');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Invalid email or password');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,7 +42,7 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="login-container">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -40,6 +54,7 @@ const LoginPage: React.FC = () => {
           </div>
           <h1>Welcome Back</h1>
           <p>Login to your UniHub account to continue</p>
+          {error && <div className="error-message">{error}</div>}
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
@@ -82,8 +97,8 @@ const LoginPage: React.FC = () => {
             </div>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className={`login-button ${isLoading ? 'loading' : ''}`}
             disabled={isLoading}
           >

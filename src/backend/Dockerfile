@@ -11,6 +11,8 @@ RUN mvn -Dmaven.test.skip=true package
 
 FROM eclipse-temurin:25-jre
 
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=builder /app/target/backend-0.0.1-SNAPSHOT.jar app.jar
