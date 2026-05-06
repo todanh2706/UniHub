@@ -1,11 +1,11 @@
 import React from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Users, 
-  Settings, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Calendar,
+  Users,
+  Settings,
+  LogOut,
   PlusCircle,
   ChevronRight,
   Bell
@@ -24,7 +24,7 @@ const OrganizerLayout: React.FC = () => {
 
   const navItems = [
     { name: 'Workshops', path: '/organizer', icon: Calendar },
-    { name: 'Registrations', path: '/organizer/registrations', icon: Users },
+    // { name: 'Registrations', path: '/organizer/registrations', icon: Users },
     { name: 'Analytics', path: '/organizer/analytics', icon: LayoutDashboard },
     { name: 'Settings', path: '/organizer/settings', icon: Settings },
   ];
@@ -32,9 +32,9 @@ const OrganizerLayout: React.FC = () => {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-color)' }}>
       {/* Sidebar */}
-      <aside style={{ 
-        width: '280px', 
-        backgroundColor: 'var(--surface-color)', 
+      <aside style={{
+        width: '280px',
+        backgroundColor: 'var(--surface-color)',
         borderRight: '1px solid var(--neutral-200)',
         display: 'flex',
         flexDirection: 'column',
@@ -44,10 +44,10 @@ const OrganizerLayout: React.FC = () => {
         zIndex: 100
       }}>
         <div style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ 
-            width: '40px', 
-            height: '40px', 
-            backgroundColor: 'var(--primary-color)', 
+          <div style={{
+            width: '40px',
+            height: '40px',
+            backgroundColor: 'var(--primary-color)',
             borderRadius: '10px',
             display: 'flex',
             alignItems: 'center',
@@ -61,9 +61,9 @@ const OrganizerLayout: React.FC = () => {
 
         <nav style={{ flex: 1, padding: '12px' }}>
           <div style={{ marginBottom: '24px' }}>
-            <button 
+            <button
               onClick={() => navigate('/organizer/workshops/new')}
-              className="btn btn-primary" 
+              className="btn btn-primary"
               style={{ width: '100%', justifyContent: 'center', gap: '8px' }}
             >
               <PlusCircle size={18} />
@@ -75,8 +75,8 @@ const OrganizerLayout: React.FC = () => {
             {navItems.map((item) => {
               const isActive = location.pathname === item.path || (item.path !== '/organizer' && location.pathname.startsWith(item.path));
               return (
-                <Link 
-                  key={item.path} 
+                <Link
+                  key={item.path}
                   to={item.path}
                   style={{
                     display: 'flex',
@@ -102,10 +102,10 @@ const OrganizerLayout: React.FC = () => {
 
         <div style={{ padding: '24px', borderTop: '1px solid var(--neutral-200)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              borderRadius: '50%', 
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
               backgroundColor: 'var(--neutral-100)',
               display: 'flex',
               alignItems: 'center',
@@ -122,13 +122,13 @@ const OrganizerLayout: React.FC = () => {
               <div style={{ fontSize: '12px', color: 'var(--text-body)', textTransform: 'capitalize' }}>Organizer</div>
             </div>
           </div>
-          <button 
+          <button
             onClick={handleLogout}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              width: '100%', 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              width: '100%',
               padding: '10px',
               border: 'none',
               background: 'none',
@@ -146,9 +146,9 @@ const OrganizerLayout: React.FC = () => {
 
       {/* Main Content */}
       <div style={{ flex: 1, marginLeft: '280px', display: 'flex', flexDirection: 'column' }}>
-        <header style={{ 
-          height: '80px', 
-          backgroundColor: 'var(--surface-color)', 
+        <header style={{
+          height: '80px',
+          backgroundColor: 'var(--surface-color)',
           borderBottom: '1px solid var(--neutral-200)',
           display: 'flex',
           alignItems: 'center',
@@ -158,22 +158,22 @@ const OrganizerLayout: React.FC = () => {
           top: 0,
           zIndex: 90
         }}>
-          <button style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: 'var(--text-body)', 
+          <button style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-body)',
             cursor: 'pointer',
             position: 'relative',
             padding: '8px'
           }}>
             <Bell size={22} />
-            <span style={{ 
-              position: 'absolute', 
-              top: '8px', 
-              right: '8px', 
-              width: '8px', 
-              height: '8px', 
-              backgroundColor: 'var(--danger-color)', 
+            <span style={{
+              position: 'absolute',
+              top: '8px',
+              right: '8px',
+              width: '8px',
+              height: '8px',
+              backgroundColor: 'var(--danger-color)',
               borderRadius: '50%',
               border: '2px solid white'
             }}></span>
