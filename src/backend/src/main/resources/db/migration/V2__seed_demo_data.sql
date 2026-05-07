@@ -243,12 +243,32 @@ INSERT INTO workshop_change_logs (id, workshop_id, field_name, old_value, new_va
 INSERT INTO rate_limit_policies (id, scope, endpoint, role_code, limit_value, window_seconds, algorithm, enabled) VALUES
     (
         '43000000-0000-0000-0000-000000000001',
-        'ROLE',
+        'USER',
         '/api/v1/registrations',
         'STUDENT',
-        30,
+        5,
+        3,
+        'TOKEN_BUCKET',
+        TRUE
+    ),
+    (
+        '43000000-0000-0000-0000-000000000002',
+        'IP',
+        '/api/v1/registrations',
+        NULL,
+        90,
         60,
-        'SLIDING_WINDOW',
+        'TOKEN_BUCKET',
+        TRUE
+    ),
+    (
+        '43000000-0000-0000-0000-000000000003',
+        'USER',
+        '/api/v1/payments',
+        NULL,
+        3,
+        10,
+        'TOKEN_BUCKET',
         TRUE
     );
 

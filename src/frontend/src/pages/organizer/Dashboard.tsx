@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
-  MoreVertical, 
   Users, 
   Calendar, 
   MapPin, 
@@ -38,7 +37,7 @@ const OrganizerDashboard: React.FC = () => {
   const fetchWorkshops = async () => {
     try {
       const response = await api.get('/organizer/workshops');
-      setWorkshops(response.data);
+      setWorkshops(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch workshops', error);
     } finally {

@@ -1,12 +1,16 @@
 package vn.unihub.backend.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import vn.unihub.backend.circuitbreaker.CircuitBreakerService;
+import vn.unihub.backend.circuitbreaker.CircuitBreakerService;
 import vn.unihub.backend.dto.registration.CancelRegistrationResponse;
 import vn.unihub.backend.dto.registration.OrganizerRegistrationSummaryResponse;
 import vn.unihub.backend.dto.registration.RegistrationResponse;
@@ -14,8 +18,13 @@ import vn.unihub.backend.dto.registration.WorkshopDetailResponse;
 import vn.unihub.backend.dto.registration.WorkshopListItemResponse;
 import vn.unihub.backend.entity.auth.User;
 import vn.unihub.backend.entity.catalog.Workshop;
+import vn.unihub.backend.entity.payment.IdempotencyKey;
+import vn.unihub.backend.entity.payment.Payment;
 import vn.unihub.backend.entity.registration.Registration;
 import vn.unihub.backend.entity.student.Student;
+import vn.unihub.backend.idempotency.IdempotencyService;
+import vn.unihub.backend.payment.PaymentService;
+import vn.unihub.backend.repository.PaymentRepository;
 import vn.unihub.backend.repository.catalog.WorkshopRepository;
 import vn.unihub.backend.repository.registration.RegistrationRepository;
 import vn.unihub.backend.repository.student.StudentRepository;
@@ -28,6 +37,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class RegistrationService {
     private static final String STATUS_CONFIRMED = "CONFIRMED";
     private static final String STATUS_PENDING_PAYMENT = "PENDING_PAYMENT";
@@ -37,15 +47,27 @@ public class RegistrationService {
     private final WorkshopRepository workshopRepository;
     private final RegistrationRepository registrationRepository;
     private final StudentRepository studentRepository;
+    private final PaymentRepository paymentRepository;
+    private final PaymentService paymentService;
+    private final IdempotencyService idempotencyService;
+    private final ObjectMapper objectMapper;
 
     public RegistrationService(
             WorkshopRepository workshopRepository,
             RegistrationRepository registrationRepository,
-            StudentRepository studentRepository
+            StudentRepository studentRepository,
+            PaymentRepository paymentRepository,
+            PaymentService paymentService,
+            IdempotencyService idempotencyService,
+            ObjectMapper objectMapper
     ) {
         this.workshopRepository = workshopRepository;
         this.registrationRepository = registrationRepository;
         this.studentRepository = studentRepository;
+        this.paymentRepository = paymentRepository;
+        this.paymentService = paymentService;
+        this.idempotencyService = idempotencyService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -88,10 +110,24 @@ public class RegistrationService {
     }
 
     @Transactional
-    public RegistrationResponse createRegistration(User user, UUID workshopId) {
+    public RegistrationResponse createRegistration(User user, UUID workshopId, String idempotencyKey) {
         if (workshopId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workshopId is required");
         }
+
+        // Idempotency check
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            // Check if already completed
+            String cached = idempotencyService.getCachedResponse(idempotencyKey);
+            if (cached != null && !"IN_PROGRESS".equals(cached)) {
+                try {
+                    return objectMapper.readValue(cached, RegistrationResponse.class);
+                } catch (Exception e) {
+                    log.warn("Failed to replay idempotent response for key: {}", idempotencyKey);
+                }
+            }
+        }
+
         Student student = resolveActiveStudent(user);
         Workshop workshop = workshopRepository.findByIdForUpdate(workshopId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Workshop not found"));
@@ -99,9 +135,6 @@ public class RegistrationService {
         Instant now = Instant.now();
         if (!"PUBLISHED".equals(workshop.getStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Workshop is not open for registration");
-        }
-        if (workshop.getPriceAmount().compareTo(BigDecimal.ZERO) > 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paid workshops are not supported in this phase");
         }
         if (now.isBefore(workshop.getRegistrationOpensAt()) || now.isAfter(workshop.getRegistrationClosesAt())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Registration window is closed");
@@ -118,15 +151,62 @@ public class RegistrationService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Workshop is full");
         }
 
-        Registration registration = Registration.builder()
-                .student(student)
-                .workshop(workshop)
-                .status(STATUS_CONFIRMED)
-                .qrToken("qr_" + UUID.randomUUID())
-                .confirmedAt(now)
-                .build();
+        boolean isPaid = workshop.getPriceAmount().compareTo(BigDecimal.ZERO) > 0;
+
+        // Reserve idempotency key before creating registration
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotencyService.reserve(idempotencyKey, user,
+                    "/api/v1/registrations", workshopId.toString());
+        }
+
+        Registration registration;
+        if (isPaid) {
+            registration = Registration.builder()
+                    .student(student)
+                    .workshop(workshop)
+                    .status(STATUS_PENDING_PAYMENT)
+                    .qrToken("qr_" + UUID.randomUUID())
+                    .expiresAt(now.plusSeconds(900)) // 15-minute hold
+                    .build();
+        } else {
+            registration = Registration.builder()
+                    .student(student)
+                    .workshop(workshop)
+                    .status(STATUS_CONFIRMED)
+                    .qrToken("qr_" + UUID.randomUUID())
+                    .confirmedAt(now)
+                    .build();
+        }
+
         Registration saved = registrationRepository.save(registration);
-        return toRegistrationResponse(saved);
+
+        // For paid workshops, initiate payment through circuit breaker
+        if (isPaid) {
+            try {
+                Payment payment = paymentService.initiatePayment(saved);
+                paymentRepository.save(payment);
+                
+                if ("SUCCEEDED".equals(payment.getStatus())) {
+                    saved.setStatus(STATUS_CONFIRMED);
+                    saved.setConfirmedAt(now);
+                    saved.setExpiresAt(null);
+                    saved = registrationRepository.save(saved);
+                }
+            } catch (CircuitBreakerService.PaymentGatewayUnavailableException e) {
+                // Payment gateway unavailable - registration stays PENDING_PAYMENT
+                // Registration will expire in 15 minutes via worker
+                log.warn("Payment gateway unavailable for registration: {}", saved.getId());
+            }
+        }
+
+        RegistrationResponse response = toRegistrationResponse(saved);
+
+        // Complete idempotency
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotencyService.complete(idempotencyKey, response, 201);
+        }
+
+        return response;
     }
 
     @Transactional(readOnly = true)

@@ -26,6 +26,32 @@ application:
     jwt:
       secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
       expiration: ${JWT_EXPIRATION:86400000} # 1 day
+  rate-limit:
+    policies:
+      - scope: IP
+        endpoint: POST:/api/v1/registrations
+        limit-value: 90
+        window-seconds: 60
+        algorithm: TOKEN_BUCKET
+        enabled: true
+      - scope: IP
+        endpoint: POST:/api/v1/auth/login
+        limit-value: 20
+        window-seconds: 60
+        algorithm: TOKEN_BUCKET
+        enabled: true
+      - scope: IP
+        endpoint: GET:/api/v1/workshops
+        limit-value: 300
+        window-seconds: 60
+        algorithm: TOKEN_BUCKET
+        enabled: true
+      - scope: USER
+        endpoint: POST:/api/v1/payments
+        limit-value: 3
+        window-seconds: 10
+        algorithm: TOKEN_BUCKET
+        enabled: true
 
 management:
   endpoints:

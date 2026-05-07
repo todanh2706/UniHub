@@ -1,8 +1,134 @@
-# API T07 - Registration and Seat Conflict Handling
+# UniHub API Documentation
 
 Base path: `/api/v1`
 
-Authentication: HTTP Basic (current project setup), all endpoints require authenticated user.
+Authentication: Bearer JWT token. Public endpoints: `/auth/**`, `/actuator/**`. All other endpoints require authenticated user.
+
+---
+
+## Authentication
+
+### Login
+
+- Method: `POST`
+- Path: `/auth/login`
+- Auth: public
+- Rate limit: 20 requests/phut/IP
+- Request:
+```json
+{
+  "email": "student1@unihub.local",
+  "password": "secret"
+}
+```
+- Response: `200 OK`
+```json
+{
+  "token": "eyJhbG...",
+  "refreshToken": "abc...",
+  "user": { "id": "...", "email": "...", "fullName": "...", "roles": [...] }
+}
+```
+
+### Register
+
+- Method: `POST`
+- Path: `/auth/register`
+- Auth: public
+- Response: `200 OK` (same shape as login)
+
+### Refresh Token
+
+- Method: `POST`
+- Path: `/auth/refresh`
+- Auth: public
+- Request: `{ "refreshToken": "..." }`
+
+### Logout
+
+- Method: `POST`
+- Path: `/auth/logout`
+- Auth: public
+- Request: `{ "refreshToken": "..." }`
+
+---
+
+## Rate Limiting (T12)
+
+### Overview
+
+All endpoints are protected by Token Bucket rate limiting backed by Redis (with local fallback).
+
+### Rate Limit Headers (on every response)
+
+| Header | Meaning |
+|--------|---------|
+| `X-RateLimit-Limit` | Max requests in window |
+| `X-RateLimit-Remaining` | Remaining tokens |
+| `X-RateLimit-Reset` | Unix timestamp when bucket resets |
+
+### Default Policies
+
+| Scope | Endpoint | Limit | Window |
+|-------|----------|-------|--------|
+| IP | `POST:/api/v1/auth/login` | 20 | 60s |
+| IP | `GET:/api/v1/workshops` | 300 | 60s |
+| IP | `POST:/api/v1/registrations` | 90 | 60s |
+| USER | `POST:/api/v1/registrations` | 5 | 3s |
+| USER | `POST:/api/v1/payments` | 3 | 10s |
+
+DB table `rate_limit_policies` can override/extend these.
+
+### 429 Too Many Requests
+
+```json
+{
+  "error": "RATE_LIMITED",
+  "message": "Ban dang gui yeu cau qua nhanh. Vui long thu lai sau vai giay.",
+  "retryAfterSeconds": 3
+}
+```
+
+Response headers: `Retry-After: 3`
+
+---
+
+## Idempotency Key (T12)
+
+### Overview
+
+All POST/PUT/PATCH/DELETE requests support idempotency via `Idempotency-Key` header.
+
+### Usage
+
+Client generates a UUID v4 and sends it in the header:
+```http
+Idempotency-Key: 6f4f23b7-9b24-4a3b-a93d-1c3c2f9792b7
+```
+
+- Retry with same key + same body → server replays the original response.
+- Retry with same key + different body → `409` conflict.
+- Requests before completion → `409 REQUEST_IN_PROGRESS`.
+
+### 409 Idempotency Conflict
+
+**Request still in progress:**
+```json
+{
+  "error": "REQUEST_IN_PROGRESS",
+  "message": "Yeu cau truoc do voi Idempotency-Key nay van dang duoc xu ly. Vui long thu lai sau."
+}
+```
+
+**Same key, different request body:**
+```json
+{
+  "error": "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST",
+  "message": "Idempotency-Key nay da duoc dung cho mot request khac."
+}
+```
+
+---
 
 ## Student Endpoints
 
@@ -11,10 +137,9 @@ Authentication: HTTP Basic (current project setup), all endpoints require authen
 - Method: `GET`
 - Path: `/workshops`
 - Auth: authenticated user
+- Rate limit: 300 requests/phut/IP
 - Response: `200 OK`
-- Notes:
-  - Returns all `PUBLISHED` workshops.
-  - Includes registration metadata: `activeSeats`, `remainingSeats`, `registrable`.
+- Returns all `PUBLISHED` workshops with registration metadata.
 
 ### 2) Get workshop detail
 
@@ -28,23 +153,49 @@ Authentication: HTTP Basic (current project setup), all endpoints require authen
 - Method: `POST`
 - Path: `/registrations`
 - Auth: `ROLE_STUDENT`
+- Rate limit: 5 requests/3s per-user + 90 requests/phut/IP
+- **Idempotency supported**: send `Idempotency-Key` header
 - Request body:
-
 ```json
 {
   "workshopId": "34000000-0000-0000-0000-000000000001"
 }
 ```
+- Response: `201 Created`
+```json
+{
+  "id": "...",
+  "workshopId": "...",
+  "workshopTitle": "CV chuan doanh nghiep",
+  "status": "CONFIRMED",
+  "qrToken": "qr_...",
+  "qrPayload": "/api/v1/checkins/qr/qr_...",
+  "createdAt": "...",
+  "confirmedAt": "...",
+  "workshopStartTime": "...",
+  "workshopEndTime": "..."
+}
+```
 
-- Response: `200 OK`
-- Error cases:
-  - `400 Bad Request`: workshop not published, window closed, paid workshop, missing workshopId
-  - `404 Not Found`: workshop not found
-  - `409 Conflict`: full workshop, duplicate active registration, time overlap
-- Business behavior:
-  - Uses DB transaction + pessimistic lock on workshop row.
-  - Creates registration with status `CONFIRMED`.
-  - Returns `qrToken` and `qrPayload` string for frontend QR rendering.
+**Error cases:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | Bad Request | Workshop not PUBLISHED, window closed, missing workshopId |
+| 404 | Not Found | Workshop not found |
+| 409 | Conflict | Full workshop, duplicate active registration, time overlap |
+| 409 | REQUEST_IN_PROGRESS | Previous idempotent request still processing |
+| 409 | IDEMPOTENCY_KEY_REUSED | Same key used with different request |
+| 429 | RATE_LIMITED | Rate limit exceeded |
+| 503 | PAYMENT_UNAVAILABLE | Payment gateway unavailable (paid workshops only) |
+
+**Business behavior:**
+
+- **Free workshop** (price = 0): creates `CONFIRMED` registration immediately.
+- **Paid workshop** (price > 0): creates `PENDING_PAYMENT` registration (15-min hold), then initiates payment through circuit breaker.
+  - Payment success → `CONFIRMED`.
+  - Payment timeout/failure → stays `PENDING_PAYMENT` until TTL expires.
+  - Circuit breaker OPEN → returns `503 PAYMENT_UNAVAILABLE`, does NOT hold seat.
 
 ### 4) List my registrations
 
@@ -66,11 +217,49 @@ Authentication: HTTP Basic (current project setup), all endpoints require authen
 - Path: `/registrations/{registrationId}`
 - Auth: `ROLE_STUDENT`
 - Response: `200 OK`
-- Error cases:
-  - `400 Bad Request`: registration not active or workshop already started
-  - `404 Not Found`: registration not owned by current student or not found
-- Rule:
-  - Student can cancel only active registration before workshop start.
+- Error: `400` if not active or workshop already started, `404` not found
+
+---
+
+## Circuit Breaker (T12)
+
+### Overview
+
+Payment gateway is protected by Resilience4j circuit breaker.
+
+**State machine:**
+```
+CLOSED ──(5 consecutive failures)──→ OPEN
+OPEN   ──(after 30s)───────────────→ HALF_OPEN
+HALF_OPEN ──(success)──────────────→ CLOSED
+HALF_OPEN ──(failure)──────────────→ OPEN
+```
+
+**Failures counted:** timeout, HTTP 5xx, connection refused, RuntimeException.
+**Not counted as failure:** IllegalArgumentException (business validation).
+
+### 503 Payment Unavailable
+
+When circuit is OPEN or payment gateway fails:
+```json
+{
+  "error": "PAYMENT_UNAVAILABLE",
+  "message": "Cong thanh toan dang tam thoi gian doan. Vui long thu lai sau it phut.",
+  "retryAfterSeconds": 30
+}
+```
+
+Response headers: `Retry-After: 30`
+
+### Graceful degradation
+
+| Scenario | Free workshops | Paid workshops |
+|----------|---------------|----------------|
+| Circuit CLOSED | Register normally | Register + payment |
+| Circuit OPEN | Register normally | `503` — do NOT hold seat |
+| Payment timeout | N/A | `PENDING_PAYMENT` 15-min TTL |
+
+---
 
 ## Organizer Endpoints
 
@@ -80,7 +269,7 @@ Authentication: HTTP Basic (current project setup), all endpoints require authen
 - Path: `/organizer/workshops/{workshopId}/registrations`
 - Auth: `ROLE_ORGANIZER` or `ROLE_ADMIN`
 - Query params:
-  - `status` (optional): if omitted, default returns active statuses
+  - `status` (optional): filter by status, default returns active
   - `page` (optional, default `0`)
   - `size` (optional, default `20`)
 - Response: `200 OK`, `404 Not Found`
@@ -92,20 +281,74 @@ Authentication: HTTP Basic (current project setup), all endpoints require authen
 - Auth: `ROLE_ORGANIZER` or `ROLE_ADMIN`
 - Response: `200 OK`, `404 Not Found`
 - Returns:
-  - `capacity`
-  - `confirmedCount`
-  - `pendingPaymentCount`
-  - `activeCount`
-  - `remainingSeats`
+```json
+{
+  "workshopId": "...",
+  "capacity": 60,
+  "confirmedCount": 45,
+  "pendingPaymentCount": 3,
+  "activeSeats": 48,
+  "remainingSeats": 12
+}
+```
 
-## Response Shape Highlights
+---
 
-- `RegistrationResponse` includes:
-  - `id`, `workshopId`, `workshopTitle`, `status`
-  - `qrToken`, `qrPayload`
-  - `createdAt`, `confirmedAt`, `cancelledAt`
-  - `workshopStartTime`, `workshopEndTime`
+## Response Shape Reference
 
-- `OrganizerRegistrationListResponse` includes:
-  - `items`
-  - pagination metadata: `page`, `size`, `totalElements`, `totalPages`
+### `RegistrationResponse`
+```json
+{
+  "id": "UUID",
+  "workshopId": "UUID",
+  "workshopTitle": "string",
+  "status": "CONFIRMED | PENDING_PAYMENT | CANCELLED | EXPIRED",
+  "qrToken": "string",
+  "qrPayload": "string (URL for QR)",
+  "createdAt": "ISO 8601",
+  "confirmedAt": "ISO 8601 | null",
+  "cancelledAt": "ISO 8601 | null",
+  "workshopStartTime": "ISO 8601",
+  "workshopEndTime": "ISO 8601"
+}
+```
+
+### `OrganizerRegistrationSummaryResponse`
+```json
+{
+  "workshopId": "UUID",
+  "capacity": "number",
+  "confirmedCount": "number",
+  "pendingPaymentCount": "number",
+  "activeSeats": "number",
+  "remainingSeats": "number"
+}
+```
+
+### `OrganizerRegistrationListResponse`
+```json
+{
+  "items": ["RegistrationResponse..."],
+  "page": "number",
+  "size": "number",
+  "totalElements": "number",
+  "totalPages": "number"
+}
+```
+
+---
+
+## Status Codes Summary
+
+| Code | Meaning | When |
+|------|---------|------|
+| 200 | OK | Normal response |
+| 201 | Created | Registration created |
+| 204 | No Content | Logout successful |
+| 400 | Bad Request | Validation error |
+| 401 | Unauthorized | Missing/invalid token |
+| 403 | Forbidden | Wrong role |
+| 404 | Not Found | Resource not found |
+| 409 | Conflict | Duplicate, idempotency conflict |
+| 429 | Too Many Requests | Rate limited |
+| 503 | Service Unavailable | Payment gateway unavailable |

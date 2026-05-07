@@ -92,3 +92,7 @@ coverage/
 .nyc_output/
 *.lcov
 .cypress/
+
+.opencode/
+ORIGINAL.md
+AGENTS.md

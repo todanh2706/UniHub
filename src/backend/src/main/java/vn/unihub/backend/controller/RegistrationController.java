@@ -48,9 +48,12 @@ public class RegistrationController {
 
     @PostMapping("/registrations")
     @PreAuthorize("hasRole('STUDENT')")
-    public RegistrationResponse createRegistration(@RequestBody CreateRegistrationRequest request, Authentication authentication) {
+    public RegistrationResponse createRegistration(
+            @RequestBody CreateRegistrationRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            Authentication authentication) {
         User user = currentUser(authentication);
-        return registrationService.createRegistration(user, request.workshopId());
+        return registrationService.createRegistration(user, request.workshopId(), idempotencyKey);
     }
 
     @GetMapping("/registrations/me")
