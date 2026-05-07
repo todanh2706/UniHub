@@ -274,3 +274,47 @@ done
 - Bucket4j duoc dung cho local fallback khi Redis loi.
 - Frontend tu dong sinh `Idempotency-Key` cho moi mutation request.
 - Chi tiet API xem tai `walkthough/API.md`.
+
+---
+
+## Bugfixes (Spring Boot 4 migration)
+
+Sau khi nang tu Spring Boot 3 -> 4 (Spring Framework 6.1 -> 6.2), code T12 gap 3 loi compilation. Da fix:
+
+### 1) Missing import `@RequestHeader`
+
+**File:** `RegistrationController.java`
+
+**Loi:** `cannot find symbol: class RequestHeader`
+
+**Nguyen nhan:** `@RequestHeader` khong duoc import.
+
+**Fix:** Them `import org.springframework.web.bind.annotation.RequestHeader;`
+
+### 2) `ContentCachingRequestWrapper` constructor thay doi
+
+**File:** `IdempotencyFilter.java` line 52
+
+**Loi:** `constructor ContentCachingRequestWrapper ... required: HttpServletRequest, int`
+
+**Nguyen nhan:** Spring 6.2 bo constructor 1-param, chi giu constructor 2-param voi `int contentCacheLimit`.
+
+**Fix:** `new ContentCachingRequestWrapper(request, -1)`
+
+### 3) `ObjectMapper` khong con la Spring bean
+
+**File:** `IdempotencyService.java`, `RegistrationService.java`
+
+**Loi:** `required a bean of type ObjectMapper that could not be found`
+
+**Nguyen nhan:** Spring Boot 4 khong auto-config `ObjectMapper` bean.
+
+**Fix:** Thay bang `new ObjectMapper()` trong field initializer.
+
+### 4) CORS thieu `Idempotency-Key`
+
+**File:** `SecurityConfig.java`
+
+**Loi:** Browser preflight chan vi `Idempotency-Key` khong co trong `Access-Control-Allow-Headers`.
+
+**Fix:** Them `"Idempotency-Key"` vao `setAllowedHeaders()`. Them `Retry-After`, `X-RateLimit-*` vao `setExposedHeaders()`.

@@ -294,6 +294,94 @@ Response headers: `Retry-After: 30`
 
 ---
 
+## AI Summary Endpoints (T09)
+
+### Overview
+
+Organizers can upload PDF documents for a workshop. The system extracts text and generates an AI summary via OpenRouter (OpenAI-compatible API).
+
+**Preview endpoints** (any authenticated user) can read summaries on the student workshop detail page.
+
+### 9) Upload PDF & generate summary
+
+- Method: `POST`
+- Path: `/ai/workshops/{workshopId}/documents`
+- Auth: `ROLE_ORGANIZER` or `ROLE_ADMIN`
+- Content-Type: `multipart/form-data`
+- Max file size: 10 MB
+- Accepts: `.pdf` files only
+- Request: form field `file` (MultipartFile)
+- Response: `200 OK`
+```json
+{
+  "documentId": "UUID",
+  "fileName": "workshop-slides.pdf",
+  "fileSize": 123456,
+  "status": "COMPLETED"
+}
+```
+
+**Possible status values:**
+
+| Status | Meaning |
+|--------|---------|
+| `EXTRACTING` | PDF being processed |
+| `EXTRACTED` | Text extracted, summarizing... |
+| `SUMMARIZING` | AI model generating summary |
+| `COMPLETED` | Pipeline finished successfully |
+| `NO_TEXT` | PDF has no extractable text (scanned image) |
+| `EXTRACTION_FAILED` | PDFBox could not parse the PDF |
+| `SUMMARY_FAILED` | AI API returned an error |
+
+### 10) List documents
+
+- Method: `GET`
+- Path: `/ai/workshops/{workshopId}/documents`
+- Auth: `ROLE_ORGANIZER` or `ROLE_ADMIN`
+- Response: `200 OK`
+```json
+[
+  {
+    "id": "UUID",
+    "workshop": { "id": "UUID" },
+    "fileUrl": "./data/documents/.../uuid.pdf",
+    "fileName": "slides.pdf",
+    "mimeType": "application/pdf",
+    "fileSize": 123456,
+    "processingStatus": "COMPLETED",
+    "extractedText": "...",
+    "errorMessage": null
+  }
+]
+```
+
+### 11) Get latest summary
+
+- Method: `GET`
+- Path: `/ai/workshops/{workshopId}/summary`
+- Auth: any authenticated user (students included)
+- Response: `200 OK` if summary exists, otherwise `204 No Content`
+```json
+{
+  "summaryId": "UUID",
+  "documentId": "UUID",
+  "model": "openai/gpt-4o-mini",
+  "status": "COMPLETED",
+  "summaryText": "Workshop nay tap trung vao... (tom tat 3-5 cau tieng Viet)",
+  "errorMessage": null,
+  "createdAt": "2026-05-07T12:00:00Z"
+}
+```
+
+### 12) Re-generate summary
+
+- Method: `POST`
+- Path: `/ai/documents/{documentId}/summarize`
+- Auth: `ROLE_ORGANIZER` or `ROLE_ADMIN`
+- Response: `200 OK` (same shape as get summary)
+
+---
+
 ## Response Shape Reference
 
 ### `RegistrationResponse`
@@ -333,6 +421,29 @@ Response headers: `Retry-After: 30`
   "size": "number",
   "totalElements": "number",
   "totalPages": "number"
+}
+```
+
+### `DocumentUploadResponse`
+```json
+{
+  "documentId": "UUID",
+  "fileName": "string",
+  "fileSize": "number",
+  "status": "COMPLETED | EXTRACTING | NO_TEXT | EXTRACTION_FAILED | SUMMARY_FAILED"
+}
+```
+
+### `AiSummaryResponse`
+```json
+{
+  "summaryId": "UUID",
+  "documentId": "UUID",
+  "model": "string",
+  "status": "COMPLETED | FAILED",
+  "summaryText": "string | null",
+  "errorMessage": "string | null",
+  "createdAt": "ISO 8601"
 }
 ```
 

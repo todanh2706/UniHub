@@ -96,3 +96,5 @@ coverage/
 .opencode/
 ORIGINAL.md
 AGENTS.md
+
+.pi/
