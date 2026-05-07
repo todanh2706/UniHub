@@ -20,6 +20,10 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 application:
   security:
@@ -52,6 +56,14 @@ application:
         window-seconds: 10
         algorithm: TOKEN_BUCKET
         enabled: true
+
+app:
+  ai:
+    api-key: ${AI_API_KEY:}
+    base-url: ${AI_BASE_URL:https://openrouter.ai/api/v1}
+    model: ${AI_MODEL:openai/gpt-4o-mini}
+    docs-dir: ${AI_DOCS_DIR:./data/documents}
+    max-file-size-mb: 10
 
 management:
   endpoints:

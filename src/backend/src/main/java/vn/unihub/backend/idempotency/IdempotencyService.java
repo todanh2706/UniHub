@@ -20,12 +20,18 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class IdempotencyService {
 
     private final IdempotencyKeyRepository repository;
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
+
+    public IdempotencyService(IdempotencyKeyRepository repository,
+                              RedisTemplate<String, String> redisTemplate) {
+        this.repository = repository;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = new ObjectMapper();
+    }
 
     private static final String REDIS_PREFIX = "idem:";
     private static final long TTL_SECONDS = 3600; // 1 hour

@@ -49,7 +49,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         }
 
         // Wrap request to cache body for idempotency check
-        ContentCachingRequestWrapper wrappedRequest = new ContentCachingRequestWrapper(request);
+        ContentCachingRequestWrapper wrappedRequest = new ContentCachingRequestWrapper(request, -1);
 
         try {
             filterChain.doFilter(wrappedRequest, response);

@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import vn.unihub.backend.circuitbreaker.CircuitBreakerService;
-import vn.unihub.backend.circuitbreaker.CircuitBreakerService;
 import vn.unihub.backend.dto.registration.CancelRegistrationResponse;
 import vn.unihub.backend.dto.registration.OrganizerRegistrationSummaryResponse;
 import vn.unihub.backend.dto.registration.RegistrationResponse;
@@ -50,7 +49,7 @@ public class RegistrationService {
     private final PaymentRepository paymentRepository;
     private final PaymentService paymentService;
     private final IdempotencyService idempotencyService;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RegistrationService(
             WorkshopRepository workshopRepository,
@@ -58,8 +57,7 @@ public class RegistrationService {
             StudentRepository studentRepository,
             PaymentRepository paymentRepository,
             PaymentService paymentService,
-            IdempotencyService idempotencyService,
-            ObjectMapper objectMapper
+            IdempotencyService idempotencyService
     ) {
         this.workshopRepository = workshopRepository;
         this.registrationRepository = registrationRepository;
@@ -67,7 +65,6 @@ public class RegistrationService {
         this.paymentRepository = paymentRepository;
         this.paymentService = paymentService;
         this.idempotencyService = idempotencyService;
-        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)

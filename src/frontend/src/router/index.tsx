@@ -13,6 +13,7 @@ import OrganizerLayout from '../pages/organizer/Layout';
 import OrganizerDashboard from '../pages/organizer/Dashboard';
 import WorkshopForm from '../pages/organizer/WorkshopForm';
 import RegistrationList from '../pages/organizer/RegistrationList';
+import AiSummaryPage from '../pages/organizer/AiSummaryPage';
 import LoginPage from '../pages/auth/LoginPage';
 import SignUpPage from '../pages/auth/SignUpPage';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -94,6 +95,10 @@ export const router = createBrowserRouter([
           {
             path: 'workshops/:id/registrations',
             element: <RegistrationList />
+          },
+          {
+            path: 'workshops/:id/ai-summary',
+            element: <AiSummaryPage />
           }
         ]
       }

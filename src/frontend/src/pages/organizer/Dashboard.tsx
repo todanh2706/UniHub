@@ -9,7 +9,8 @@ import {
   Edit2, 
   Trash2, 
   ExternalLink,
-  Filter
+  Filter,
+  FileText
 } from 'lucide-react';
 import api from '../../api/axios';
 
@@ -186,6 +187,14 @@ const OrganizerDashboard: React.FC = () => {
                 >
                   <Users size={16} />
                   <span>Registrations</span>
+                </button>
+                <button 
+                  onClick={() => navigate(`/organizer/workshops/${workshop.id}/ai-summary`)}
+                  className="btn" 
+                  style={{ backgroundColor: 'var(--neutral-100)', color: 'var(--text-heading)', fontSize: '14px' }}
+                  title="AI Summary"
+                >
+                  <FileText size={16} />
                 </button>
                 <button 
                   onClick={() => navigate(`/workshops/${workshop.id}`)}
