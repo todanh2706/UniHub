@@ -64,6 +64,10 @@ app:
     model: ${AI_MODEL:openai/gpt-4o-mini}
     docs-dir: ${AI_DOCS_DIR:./data/documents}
     max-file-size-mb: 10
+  csv-sync:
+    csv-dir: ${CSV_SYNC_DIR:./data/csv}
+    cron: ${CSV_SYNC_CRON:0 0 2 * * *}
+    batch-size: ${CSV_SYNC_BATCH_SIZE:100}
 
 management:
   endpoints:

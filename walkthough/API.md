@@ -449,6 +449,130 @@ Organizers can upload PDF documents for a workshop. The system extracts text and
 
 ---
 
+## CSV Sync Endpoints (T10)
+
+### Overview
+
+Nightly scheduled job (2 AM) that imports student data from CSV files. Organizers can also trigger a manual sync from the admin UI.
+
+- Scheduled via `@Scheduled(cron = "${app.csv-sync.cron}")` (default: `0 0 2 * * *`)
+- Manual trigger via REST API or Admin UI button
+- Deduplication by SHA-256 file checksum (skips already-imported files)
+- Fault-tolerant: invalid rows are logged to `csv_import_errors`, job continues
+- Batch flushing every 100 rows for large files
+
+### 13) Trigger CSV sync
+
+- Method: `POST`
+- Path: `/csv-sync/trigger`
+- Auth: `ROLE_ORGANIZER` or `ROLE_ADMIN`
+- Response: `202 Accepted`
+```json
+{
+  "jobId": "UUID"
+}
+```
+
+**Error case — sync already in progress:**
+
+Status: `409 Conflict`
+```json
+{
+  "error": "SYNC_IN_PROGRESS",
+  "message": "A CSV sync is already in progress"
+}
+```
+
+### 14) Get job status
+
+- Method: `GET`
+- Path: `/csv-sync/jobs/{jobId}`
+- Auth: `ROLE_ORGANIZER` or `ROLE_ADMIN`
+- Response: `200 OK`, `404 Not Found`
+```json
+{
+  "id": "UUID",
+  "fileName": "sample_students_500.csv",
+  "status": "COMPLETED",
+  "totalRows": 500,
+  "successRows": 498,
+  "failedRows": 2,
+  "startedAt": "2026-05-07T02:00:00Z",
+  "finishedAt": "2026-05-07T02:00:05Z"
+}
+```
+
+**Possible status values:**
+
+| Status | Meaning |
+|--------|---------|
+| `PROCESSING` | Import in progress |
+| `COMPLETED` | All rows imported successfully |
+| `PARTIALLY_COMPLETED` | Some rows had errors |
+| `FAILED` | Job failed (e.g., missing columns, IO error) |
+
+### 15) List recent jobs
+
+- Method: `GET`
+- Path: `/csv-sync/jobs`
+- Auth: `ROLE_ORGANIZER` or `ROLE_ADMIN`
+- Response: `200 OK`
+```json
+[
+  {
+    "id": "UUID",
+    "fileName": "sample_students_500.csv",
+    "status": "COMPLETED",
+    "totalRows": 500,
+    "successRows": 498,
+    "failedRows": 2,
+    "startedAt": "2026-05-07T02:00:00Z",
+    "finishedAt": "2026-05-07T02:00:05Z"
+  }
+]
+```
+
+### 16) Get job errors
+
+- Method: `GET`
+- Path: `/csv-sync/jobs/{jobId}/errors`
+- Auth: `ROLE_ORGANIZER` or `ROLE_ADMIN`
+- Response: `200 OK`
+```json
+[
+  {
+    "id": "UUID",
+    "rowNumber": 42,
+    "rawData": "SV042,,invalid@email,CNTT",
+    "errorCode": "MISSING_REQUIRED_FIELDS",
+    "errorMessage": "student_code, full_name, and email are required"
+  }
+]
+```
+
+**Possible error codes:**
+
+| Code | Meaning |
+|------|---------|
+| `MISSING_COLUMNS` | CSV header missing required columns |
+| `MISSING_REQUIRED_FIELDS` | Row missing student_code, full_name, or email |
+| `PARSE_ERROR` | Could not parse CSV line |
+| `INVALID_COLUMN_COUNT` | Row has fewer columns than header |
+| `UPSERT_ERROR` | Database error during upsert |
+
+### Expected CSV Format
+
+```
+student_code,full_name,email,faculty,major,cohort,status
+SV001,Nguyen Van A,a@univ.edu,CNTT,KHMT,K26,ACTIVE
+SV002,Tran Thi B,b@univ.edu,KHDL,HTTT,K26,ACTIVE
+```
+
+Required columns: `student_code`, `full_name`, `email`.
+Optional columns: `faculty`, `major`, `cohort`, `status` (defaults to `ACTIVE`).
+
+---
+
 ## Status Codes Summary
 
 | Code | Meaning | When |

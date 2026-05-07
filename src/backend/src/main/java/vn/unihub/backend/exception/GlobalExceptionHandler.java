@@ -1,6 +1,7 @@
 package vn.unihub.backend.exception;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.servlet.NoHandlerFoundException;
@@ -17,6 +18,14 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, String>> handleBadCredentials(BadCredentialsException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("message", "Invalid email or password");
+        error.put("error", "UNAUTHORIZED");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntimeException(RuntimeException ex) {
