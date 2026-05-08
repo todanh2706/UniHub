@@ -2,7 +2,8 @@ import { createBrowserRouter } from 'react-router-dom';
 
 import StudentLayout from '../pages/student/Layout';
 import StudentHome from '../pages/student/Home';
-import WorkshopDetails from '../pages/student/WorkshopDetails';
+import StudentWorkshopDetails from '../pages/student/WorkshopDetails';
+import MyRegistrations from '../pages/student/MyRegistrations';
 
 import AdminLayout from '../pages/admin/Layout';
 import AdminDashboard from '../pages/admin/Dashboard';
@@ -30,7 +31,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'workshops/:id',
-        element: <WorkshopDetails />
+        element: <StudentWorkshopDetails />
       },
       {
         path: 'my-registrations',
@@ -38,7 +39,7 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <div>My Registrations Page</div>
+            element: <MyRegistrations />
           }
         ]
       }
