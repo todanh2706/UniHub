@@ -1,11 +1,16 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Search, Bell, User } from 'lucide-react';
+import { Search, Bell, User, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 
 const StudentLayout = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
     <div className="app-layout" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -106,6 +111,7 @@ const StudentLayout = () => {
               </button>
               <div style={{ width: '1px', height: '24px', background: 'var(--neutral-200)', margin: '0 8px' }}></div>
               {isAuthenticated ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button 
                   onClick={() => navigate('/profile')}
                   style={{ 
@@ -126,6 +132,16 @@ const StudentLayout = () => {
                 >
                   <User size={20} />
                 </button>
+                <button
+                  onClick={handleLogout}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 14px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  title="Sign Out"
+                >
+                  <LogOut size={16} />
+                  <span>Sign Out</span>
+                </button>
+                </div>
               ) : (
                 <button 
                   onClick={() => navigate('/login')}

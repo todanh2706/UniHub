@@ -3,12 +3,12 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Calendar,
-  Users,
   Settings,
   LogOut,
   PlusCircle,
   ChevronRight,
-  Bell
+  Bell,
+  FileText
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -26,6 +26,7 @@ const OrganizerLayout: React.FC = () => {
     { name: 'Workshops', path: '/organizer', icon: Calendar },
     // { name: 'Registrations', path: '/organizer/registrations', icon: Users },
     { name: 'Analytics', path: '/organizer/analytics', icon: LayoutDashboard },
+    { name: 'CSV Sync', path: '/organizer/csv-sync', icon: FileText },
     { name: 'Settings', path: '/organizer/settings', icon: Settings },
   ];
 

@@ -3,10 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Save, 
-  Calendar, 
-  MapPin, 
   Type, 
-  AlignLeft, 
   Users, 
   DollarSign,
   Clock
@@ -50,15 +47,17 @@ const WorkshopForm: React.FC = () => {
         api.get('/organizer/workshops/events'),
         api.get('/organizer/workshops/rooms')
       ]);
-      setEvents(eventsRes.data);
-      setRooms(roomsRes.data);
+      const eventsData = Array.isArray(eventsRes.data) ? eventsRes.data : [];
+      const roomsData = Array.isArray(roomsRes.data) ? roomsRes.data : [];
+      setEvents(eventsData);
+      setRooms(roomsData);
       
       // Auto-select first item if creating new
       if (!isEdit) {
         setFormData(prev => ({
           ...prev,
-          eventId: eventsRes.data[0]?.id || '',
-          roomId: roomsRes.data[0]?.id || ''
+          eventId: eventsData[0]?.id || '',
+          roomId: roomsData[0]?.id || ''
         }));
       }
     } catch (error) {

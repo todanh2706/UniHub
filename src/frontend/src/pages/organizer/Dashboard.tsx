@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
-  MoreVertical, 
   Users, 
   Calendar, 
   MapPin, 
   Edit2, 
   Trash2, 
   ExternalLink,
-  Filter
+  Filter,
+  FileText
 } from 'lucide-react';
 import api from '../../api/axios';
 
@@ -38,7 +38,7 @@ const OrganizerDashboard: React.FC = () => {
   const fetchWorkshops = async () => {
     try {
       const response = await api.get('/organizer/workshops');
-      setWorkshops(response.data);
+      setWorkshops(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch workshops', error);
     } finally {
@@ -187,6 +187,14 @@ const OrganizerDashboard: React.FC = () => {
                 >
                   <Users size={16} />
                   <span>Registrations</span>
+                </button>
+                <button 
+                  onClick={() => navigate(`/organizer/workshops/${workshop.id}/ai-summary`)}
+                  className="btn" 
+                  style={{ backgroundColor: 'var(--neutral-100)', color: 'var(--text-heading)', fontSize: '14px' }}
+                  title="AI Summary"
+                >
+                  <FileText size={16} />
                 </button>
                 <button 
                   onClick={() => navigate(`/workshops/${workshop.id}`)}

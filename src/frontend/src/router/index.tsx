@@ -2,7 +2,8 @@ import { createBrowserRouter } from 'react-router-dom';
 
 import StudentLayout from '../pages/student/Layout';
 import StudentHome from '../pages/student/Home';
-import WorkshopDetails from '../pages/student/WorkshopDetails';
+import StudentWorkshopDetails from '../pages/student/WorkshopDetails';
+import MyRegistrations from '../pages/student/MyRegistrations';
 
 import AdminLayout from '../pages/admin/Layout';
 import AdminDashboard from '../pages/admin/Dashboard';
@@ -13,6 +14,8 @@ import OrganizerLayout from '../pages/organizer/Layout';
 import OrganizerDashboard from '../pages/organizer/Dashboard';
 import WorkshopForm from '../pages/organizer/WorkshopForm';
 import RegistrationList from '../pages/organizer/RegistrationList';
+import AiSummaryPage from '../pages/organizer/AiSummaryPage';
+import CsvSyncPage from '../pages/organizer/CsvSyncPage';
 import LoginPage from '../pages/auth/LoginPage';
 import SignUpPage from '../pages/auth/SignUpPage';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -28,7 +31,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'workshops/:id',
-        element: <WorkshopDetails />
+        element: <StudentWorkshopDetails />
       },
       {
         path: 'my-registrations',
@@ -36,7 +39,7 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <div>My Registrations Page</div>
+            element: <MyRegistrations />
           }
         ]
       }
@@ -94,6 +97,14 @@ export const router = createBrowserRouter([
           {
             path: 'workshops/:id/registrations',
             element: <RegistrationList />
+          },
+          {
+            path: 'workshops/:id/ai-summary',
+            element: <AiSummaryPage />
+          },
+          {
+            path: 'csv-sync',
+            element: <CsvSyncPage />
           }
         ]
       }

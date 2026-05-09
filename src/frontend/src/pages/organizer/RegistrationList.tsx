@@ -9,7 +9,6 @@ import {
   User, 
   Mail, 
   Clock,
-  Filter,
   MoreHorizontal
 } from 'lucide-react';
 import api from '../../api/axios';
@@ -25,10 +24,10 @@ interface Registration {
 
 interface Summary {
   capacity: number;
-  confirmed: number;
-  pending: number;
-  active: number;
-  remaining: number;
+  confirmedCount: number;
+  pendingPaymentCount: number;
+  activeSeats: number;
+  remainingSeats: number;
 }
 
 const RegistrationList: React.FC = () => {
@@ -54,8 +53,9 @@ const RegistrationList: React.FC = () => {
       ]);
       
       // The API returns a Page object, so we get content
-      setRegistrations(regRes.data.content || []);
-      setSummary(summaryRes.data);
+      const regContent = regRes.data?.content || (Array.isArray(regRes.data) ? regRes.data : []);
+      setRegistrations(regContent);
+      setSummary(summaryRes.data || null);
     } catch (error) {
       console.error('Failed to fetch registration data', error);
     } finally {
@@ -140,9 +140,9 @@ const RegistrationList: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', marginBottom: '40px' }}>
         {[
           { label: 'Total Capacity', value: summary?.capacity || 0, color: 'var(--text-heading)' },
-          { label: 'Confirmed', value: summary?.confirmed || 0, color: 'var(--success-color)' },
-          { label: 'Pending', value: summary?.pending || 0, color: 'var(--warning-color)' },
-          { label: 'Remaining', value: summary?.remaining || 0, color: 'var(--primary-color)' },
+          { label: 'Confirmed', value: summary?.confirmedCount || 0, color: 'var(--success-color)' },
+          { label: 'Pending', value: summary?.pendingPaymentCount || 0, color: 'var(--warning-color)' },
+          { label: 'Remaining', value: summary?.remainingSeats || 0, color: 'var(--primary-color)' },
         ].map((card, i) => (
           <div key={i} className="glass-panel" style={{ padding: '24px' }}>
             <div style={{ fontSize: '14px', color: 'var(--text-body)', marginBottom: '8px' }}>{card.label}</div>

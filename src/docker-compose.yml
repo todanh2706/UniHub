@@ -52,6 +52,9 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
       SERVER_PORT: 8080
+      CSV_SYNC_DIR: /app/data/csv
+    volumes:
+      - ./data/csv:/app/data/csv
     ports:
       - "8080:8080"
     restart: unless-stopped

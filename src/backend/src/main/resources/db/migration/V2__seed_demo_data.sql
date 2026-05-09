@@ -18,10 +18,10 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
     ('00000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000024');
 
 INSERT INTO users (id, email, password_hash, full_name, status) VALUES
-    ('10000000-0000-0000-0000-000000000001', 'student1@unihub.local', '$2a$10$N9qo8uLOickgx2ZMRZo5i.ejQ5PaXtkKtu6ugfQof8I4eAbOeXKli', 'Student One', 'ACTIVE'),
-    ('10000000-0000-0000-0000-000000000002', 'student2@unihub.local', '$2a$10$N9qo8uLOickgx2ZMRZo5i.ejQ5PaXtkKtu6ugfQof8I4eAbOeXKli', 'Student Two', 'ACTIVE'),
-    ('10000000-0000-0000-0000-000000000003', 'organizer@unihub.local', '$2a$10$N9qo8uLOickgx2ZMRZo5i.ejQ5PaXtkKtu6ugfQof8I4eAbOeXKli', 'Organizer Demo', 'ACTIVE'),
-    ('10000000-0000-0000-0000-000000000004', 'checkin@unihub.local', '$2a$10$N9qo8uLOickgx2ZMRZo5i.ejQ5PaXtkKtu6ugfQof8I4eAbOeXKli', 'Checkin Staff Demo', 'ACTIVE');
+    ('10000000-0000-0000-0000-000000000001', 'student1@unihub.local', '$2a$10$gIBcQtLddWoKielhBR4xjOUeLpFSe8jJFAs9Dbtw84mLHSRwOiPie', 'Student One', 'ACTIVE'),
+    ('10000000-0000-0000-0000-000000000002', 'student2@unihub.local', '$2a$10$gIBcQtLddWoKielhBR4xjOUeLpFSe8jJFAs9Dbtw84mLHSRwOiPie', 'Student Two', 'ACTIVE'),
+    ('10000000-0000-0000-0000-000000000003', 'organizer@unihub.local', '$2a$10$gIBcQtLddWoKielhBR4xjOUeLpFSe8jJFAs9Dbtw84mLHSRwOiPie', 'Organizer Demo', 'ACTIVE'),
+    ('10000000-0000-0000-0000-000000000004', 'checkin@unihub.local', '$2a$10$gIBcQtLddWoKielhBR4xjOUeLpFSe8jJFAs9Dbtw84mLHSRwOiPie', 'Checkin Staff Demo', 'ACTIVE');
 
 INSERT INTO user_roles (user_id, role_id) VALUES
     ('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011'),
@@ -243,12 +243,32 @@ INSERT INTO workshop_change_logs (id, workshop_id, field_name, old_value, new_va
 INSERT INTO rate_limit_policies (id, scope, endpoint, role_code, limit_value, window_seconds, algorithm, enabled) VALUES
     (
         '43000000-0000-0000-0000-000000000001',
-        'ROLE',
+        'USER',
         '/api/v1/registrations',
         'STUDENT',
-        30,
+        5,
+        3,
+        'TOKEN_BUCKET',
+        TRUE
+    ),
+    (
+        '43000000-0000-0000-0000-000000000002',
+        'IP',
+        '/api/v1/registrations',
+        NULL,
+        90,
         60,
-        'SLIDING_WINDOW',
+        'TOKEN_BUCKET',
+        TRUE
+    ),
+    (
+        '43000000-0000-0000-0000-000000000003',
+        'USER',
+        '/api/v1/payments',
+        NULL,
+        3,
+        10,
+        'TOKEN_BUCKET',
         TRUE
     );
 
