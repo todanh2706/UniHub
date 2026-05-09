@@ -17,6 +17,7 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
     ('00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000025'),
     ('00000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000024');
 
+-- Password: secret
 INSERT INTO users (id, email, password_hash, full_name, status) VALUES
     ('10000000-0000-0000-0000-000000000001', 'student1@unihub.local', '$2a$10$gIBcQtLddWoKielhBR4xjOUeLpFSe8jJFAs9Dbtw84mLHSRwOiPie', 'Student One', 'ACTIVE'),
     ('10000000-0000-0000-0000-000000000002', 'student2@unihub.local', '$2a$10$gIBcQtLddWoKielhBR4xjOUeLpFSe8jJFAs9Dbtw84mLHSRwOiPie', 'Student Two', 'ACTIVE'),

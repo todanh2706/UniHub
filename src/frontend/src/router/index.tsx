@@ -19,6 +19,7 @@ import CsvSyncPage from '../pages/organizer/CsvSyncPage';
 import LoginPage from '../pages/auth/LoginPage';
 import SignUpPage from '../pages/auth/SignUpPage';
 import ProtectedRoute from '../components/ProtectedRoute';
+import Profile from '../pages/profile/Profile';
 
 export const router = createBrowserRouter([
   {
@@ -40,6 +41,16 @@ export const router = createBrowserRouter([
           {
             index: true,
             element: <MyRegistrations />
+          }
+        ]
+      },
+      {
+        path: 'profile',
+        element: <ProtectedRoute />,
+        children: [
+          {
+            index: true,
+            element: <Profile />
           }
         ]
       }

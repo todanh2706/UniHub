@@ -1,4 +1,5 @@
 import initSqlJs, { type Database } from 'sql.js';
+import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 
 let dbInstance: Database | null = null;
 
@@ -12,7 +13,7 @@ export const initDB = async (): Promise<Database> => {
   if (dbInstance) return dbInstance;
 
   const SQL = await initSqlJs({
-    locateFile: file => `/${file}`
+    locateFile: () => wasmUrl
   });
 
   // Try to load persisted database from localStorage
