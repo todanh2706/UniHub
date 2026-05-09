@@ -109,8 +109,17 @@ const CheckinPortal: React.FC = () => {
       const scanner = new Html5Qrcode(scannerContainerId);
       scannerRef.current = scanner;
 
+      // Try to get available cameras (fixes issues on Macbooks/Laptops without back camera)
+      const devices = await Html5Qrcode.getCameras();
+      let cameraConfig: any = { facingMode: 'environment' };
+      
+      if (devices && devices.length > 0) {
+        const backCamera = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
+        cameraConfig = backCamera ? backCamera.id : devices[0].id;
+      }
+
       await scanner.start(
-        { facingMode: 'environment' },
+        cameraConfig,
         { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
         async (decodedText) => {
           // Pause scanning briefly to avoid duplicate scans
@@ -206,10 +215,11 @@ const CheckinPortal: React.FC = () => {
   );
 
   // --- QR Scanner Modal ---
-  const ScannerModal = () => (
+  const scannerModalNode = (
     <AnimatePresence>
       {showScanner && (
         <motion.div
+          key="scanner-modal"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
@@ -217,22 +227,25 @@ const CheckinPortal: React.FC = () => {
             flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           }}
         >
+          <button onClick={stopScanner} style={{
+            position: 'absolute', top: '24px', right: '24px',
+            background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%',
+            width: '48px', height: '48px', cursor: 'pointer', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', color: 'white',
+            zIndex: 10000, transition: 'background 0.2s'
+          }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+             onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}>
+            <X size={28} />
+          </button>
+
           <div style={{
             width: '100%', maxWidth: '420px', padding: '24px',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <h2 style={{ color: 'white', fontSize: '22px', fontWeight: 700, margin: 0 }}>
-                <Camera size={24} style={{ verticalAlign: 'middle', marginRight: '10px' }} />
-                Quét mã QR
+            <div style={{ width: '100%', textAlign: 'center', marginBottom: '8px' }}>
+              <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                <Camera size={26} /> Quét mã QR
               </h2>
-              <button onClick={stopScanner} style={{
-                background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%',
-                width: '44px', height: '44px', cursor: 'pointer', display: 'flex',
-                alignItems: 'center', justifyContent: 'center', color: 'white',
-              }}>
-                <X size={22} />
-              </button>
             </div>
 
             <div style={{
@@ -279,7 +292,7 @@ const CheckinPortal: React.FC = () => {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ maxWidth: '900px', margin: '0 auto' }}>
         <ToastNotification />
-        <ScannerModal />
+        {scannerModalNode}
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
           <h1 style={{ fontSize: '32px', color: 'var(--text-heading)', marginBottom: '12px' }}>Check-in Portal</h1>
           <p style={{ color: 'var(--text-body)', fontSize: '18px' }}>Select an active workshop to begin the attendance process</p>
@@ -344,7 +357,7 @@ const CheckinPortal: React.FC = () => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="animate-fade-in">
       <ToastNotification />
-      <ScannerModal />
+      {scannerModalNode}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '32px' }}>
         <div>
           <button onClick={() => setSelectedWorkshop(null)} className="btn"

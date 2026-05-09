@@ -77,12 +77,12 @@ public class OrganizerWorkshopController {
     // Quản lý danh sách đăng ký
     @GetMapping("/{id}/registrations")
     @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER') or hasAuthority('WORKSHOP_MANAGE')")
-    public ResponseEntity<Page<RegistrationResponse>> getWorkshopRegistrations(
+    public ResponseEntity<Page<vn.unihub.backend.dto.registration.OrganizerAttendeeResponse>> getWorkshopRegistrations(
             @PathVariable UUID id,
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(registrationService.listRegistrationsByWorkshop(id, status, page, size));
+        return ResponseEntity.ok(registrationService.listOrganizerAttendeesByWorkshop(id, status, page, size));
     }
 
     @GetMapping("/{id}/registration-summary")

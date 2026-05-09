@@ -6,15 +6,19 @@ interface ProtectedRouteProps {
   allowedRoles?: string[];
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = () => {
-  const { isAuthenticated, token } = useAuthStore();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
+  const { isAuthenticated, token, user } = useAuthStore();
 
   if (!isAuthenticated || !token) {
     return <Navigate to="/login" replace />;
   }
 
-  // TODO: Implement RBAC check if allowedRoles is provided
-  // This would require storing roles in the user object or decoding the JWT
+  if (allowedRoles && allowedRoles.length > 0) {
+    const hasRole = user?.roles?.some(role => allowedRoles.includes(role));
+    if (!hasRole) {
+      return <Navigate to="/unauthorized" replace />;
+    }
+  }
 
   return <Outlet />;
 };

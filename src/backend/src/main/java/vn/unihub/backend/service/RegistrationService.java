@@ -245,14 +245,13 @@ public class RegistrationService {
     }
 
     @Transactional(readOnly = true)
-    public Page<RegistrationResponse> listRegistrationsByWorkshop(UUID workshopId, String status, int page, int size) {
+    public Page<vn.unihub.backend.dto.registration.OrganizerAttendeeResponse> listOrganizerAttendeesByWorkshop(UUID workshopId, String status, int page, int size) {
         workshopRepository.findById(workshopId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Workshop not found"));
 
         Pageable pageable = PageRequest.of(page, size);
         Collection<String> statuses = normalizeStatusFilter(status);
-        return registrationRepository.findByWorkshopAndOptionalStatus(workshopId, statuses, pageable)
-                .map(this::toRegistrationResponse);
+        return registrationRepository.findOrganizerAttendeesByWorkshop(workshopId, statuses, pageable);
     }
 
     @Transactional

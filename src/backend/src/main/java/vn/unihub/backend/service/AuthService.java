@@ -67,6 +67,7 @@ public class AuthService {
                 .email(savedUser.getEmail())
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
+                .roles(java.util.List.of(studentRole.getCode()))
                 .build();
     }
 
@@ -90,12 +91,16 @@ public class AuthService {
         String firstName = names.length > 0 ? names[0] : "";
         String lastName = names.length > 1 ? names[1] : "";
 
+        java.util.List<String> roles = roleRepository.findRolesByUserId(user.getId())
+                .stream().map(Role::getCode).toList();
+
         return AuthResponse.builder()
                 .token(jwtToken)
                 .refreshToken(refreshToken)
                 .email(user.getEmail())
                 .firstName(firstName)
                 .lastName(lastName)
+                .roles(roles)
                 .build();
     }
 
@@ -114,10 +119,15 @@ public class AuthService {
                     var user = token.getUser();
                     var userDetails = new CustomUserDetails(user);
                     var accessToken = jwtService.generateToken(userDetails);
+
+                    java.util.List<String> roles = roleRepository.findRolesByUserId(user.getId())
+                            .stream().map(Role::getCode).toList();
+
                     return AuthResponse.builder()
                             .token(accessToken)
                             .refreshToken(requestRefreshToken)
                             .email(user.getEmail())
+                            .roles(roles)
                             .build();
                 })
                 .orElseThrow(() -> new RuntimeException("Refresh token is not in database!"));

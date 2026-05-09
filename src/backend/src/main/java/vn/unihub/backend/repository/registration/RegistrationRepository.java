@@ -68,6 +68,25 @@ public interface RegistrationRepository extends JpaRepository<Registration, UUID
             Pageable pageable
     );
 
+    @Query("""
+            select new vn.unihub.backend.dto.registration.OrganizerAttendeeResponse(
+                r.id,
+                r.student.fullName,
+                r.student.email,
+                r.status,
+                case when (select count(c) from Checkin c where c.registration.id = r.id) > 0 then true else false end
+            )
+            from Registration r
+            where r.workshop.id = :workshopId
+              and (:statuses is null or r.status in :statuses)
+            order by r.createdAt desc
+            """)
+    Page<vn.unihub.backend.dto.registration.OrganizerAttendeeResponse> findOrganizerAttendeesByWorkshop(
+            @Param("workshopId") UUID workshopId,
+            @Param("statuses") Collection<String> statuses,
+            Pageable pageable
+    );
+
     Optional<Registration> findByIdAndStudentId(UUID id, UUID studentId);
 
     Optional<Registration> findByQrToken(String qrToken);

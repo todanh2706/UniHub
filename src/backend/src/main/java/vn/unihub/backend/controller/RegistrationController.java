@@ -78,29 +78,6 @@ public class RegistrationController {
         return registrationService.cancelMyRegistration(user, registrationId);
     }
 
-    @GetMapping("/organizer/workshops/{workshopId}/registrations")
-    @PreAuthorize("hasRole('ORGANIZER') or hasRole('ADMIN')")
-    public OrganizerRegistrationListResponse organizerRegistrationList(
-            @PathVariable UUID workshopId,
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        Page<RegistrationResponse> result = registrationService.listRegistrationsByWorkshop(workshopId, status, page, size);
-        return new OrganizerRegistrationListResponse(
-                result.getContent(),
-                result.getNumber(),
-                result.getSize(),
-                result.getTotalElements(),
-                result.getTotalPages()
-        );
-    }
-
-    @GetMapping("/organizer/workshops/{workshopId}/registrations/summary")
-    @PreAuthorize("hasRole('ORGANIZER') or hasRole('ADMIN')")
-    public OrganizerRegistrationSummaryResponse organizerRegistrationSummary(@PathVariable UUID workshopId) {
-        return registrationService.getWorkshopRegistrationSummary(workshopId);
-    }
 
     private User currentUser(Authentication authentication) {
         return ((CustomUserDetails) authentication.getPrincipal()).getUser();

@@ -24,9 +24,9 @@ const LoginPage: React.FC = () => {
 
     try {
       const response = await api.post('/auth/login', formData);
-      const { token, refreshToken, email, firstName, lastName } = response.data;
+      const { token, refreshToken, email, firstName, lastName, roles } = response.data;
 
-      setAuth({ email, firstName, lastName }, token, refreshToken);
+      setAuth({ email, firstName, lastName, roles }, token, refreshToken);
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid email or password');
