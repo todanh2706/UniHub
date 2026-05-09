@@ -69,4 +69,6 @@ public interface RegistrationRepository extends JpaRepository<Registration, UUID
     );
 
     Optional<Registration> findByIdAndStudentId(UUID id, UUID studentId);
+
+    Optional<Registration> findByQrToken(String qrToken);
 }

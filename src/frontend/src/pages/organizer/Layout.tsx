@@ -56,7 +56,7 @@ const OrganizerLayout: React.FC = () => {
             fontWeight: 'bold',
             fontSize: '20px'
           }}>U</div>
-          <span style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-heading)' }}>UniHub Admin</span>
+          <span style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-heading)' }}>UniHub</span>
         </div>
 
         <nav style={{ flex: 1, padding: '12px' }}>

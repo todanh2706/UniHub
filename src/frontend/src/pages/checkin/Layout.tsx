@@ -2,12 +2,22 @@ import { Outlet } from 'react-router-dom';
 
 const CheckinLayout = () => {
   return (
-    <div style={{ background: '#000', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ padding: '1rem', background: '#111', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, color: 'var(--primary-color)' }}>Check-in Scanner</h3>
-        <span style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', background: 'var(--success-color)', borderRadius: '12px', color: '#fff' }}>Online</span>
+    <div style={{ background: 'var(--bg-color)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <header style={{ 
+        padding: '1.25rem 2rem', 
+        background: 'var(--surface-color)', 
+        borderBottom: '1px solid var(--neutral-200)', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        boxShadow: 'var(--shadow-sm)',
+        zIndex: 10
+      }}>
+        <h3 style={{ margin: 0, color: 'var(--primary-color)', fontSize: '1.5rem', fontWeight: 700 }}>
+          UniHub <span style={{ color: 'var(--text-heading)', fontWeight: 500 }}>Check-in</span>
+        </h3>
       </header>
-      <main style={{ flex: 1, padding: '1rem' }}>
+      <main style={{ flex: 1, padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
         <Outlet />
       </main>
     </div>
