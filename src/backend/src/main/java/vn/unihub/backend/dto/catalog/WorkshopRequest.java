@@ -15,6 +15,8 @@ public class WorkshopRequest {
     @NotBlank(message = "Title is required")
     private String title;
 
+    private String thumbnail;
+
     private String description;
 
     @NotNull(message = "Event ID is required")

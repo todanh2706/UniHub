@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import UsersManagement from './UsersManagement';
 import RequestsManagement from './RequestsManagement';
 

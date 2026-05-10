@@ -1,55 +1,22 @@
 import { motion } from 'framer-motion';
 import { Calendar, MapPin, Users, ArrowRight, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import api from '../../api/axios';
 import '../../styles/Skeleton.css';
 
 const StudentHome = () => {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1200);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const workshops = [
-    {
-      id: 1,
-      title: "Career Fair 2026: Connect with Tech Giants",
-      description: "Meet recruiters from Google, Microsoft, and Meta. Get insights into the latest tech trends and hiring processes.",
-      date: "Oct 15, 2026",
-      location: "Main Auditorium",
-      attendees: "500+",
-      price: "Free",
-      image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800",
-      category: "Career",
-      isPopular: true
-    },
-    {
-      id: 2,
-      title: "AI & Machine Learning Workshop",
-      description: "Hands-on session on building neural networks with PyTorch. Perfect for beginners and intermediates.",
-      date: "Oct 20, 2026",
-      location: "Lab 302",
-      attendees: "50",
-      price: "$20",
-      image: "https://images.unsplash.com/photo-1591453089816-0fbb971b454c?auto=format&fit=crop&q=80&w=800",
-      category: "Technology",
-      isPopular: false
-    },
-    {
-      id: 3,
-      title: "Public Speaking & Leadership",
-      description: "Master the art of communication and lead with confidence. Toastmasters special session.",
-      date: "Oct 22, 2026",
-      location: "Seminar Room B",
-      attendees: "30",
-      price: "Free",
-      image: "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80&w=800",
-      category: "Soft Skills",
-      isPopular: false
+  const { data, isLoading } = useQuery({
+    queryKey: ['home_workshops'],
+    queryFn: async () => {
+      const response = await api.get('/public/workshops?page=0&size=3');
+      return response.data;
     }
-  ];
+  });
+
+  const workshops = data?.content || [];
+
+
 
   return (
     <div style={{ background: 'var(--bg-color)' }}>
@@ -99,9 +66,11 @@ const StudentHome = () => {
             build your network, and accelerate your career.
           </p>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-            <button className="btn btn-primary" style={{ padding: '14px 32px', fontSize: '16px' }}>
-              Explore Workshops <ArrowRight size={20} />
-            </button>
+            <Link to="/workshops" style={{ textDecoration: 'none' }}>
+              <button className="btn btn-primary" style={{ padding: '14px 32px', fontSize: '16px' }}>
+                Explore Workshops <ArrowRight size={20} />
+              </button>
+            </Link>
             <button className="btn" style={{
               background: 'white',
               border: '1px solid var(--neutral-300)',
@@ -149,7 +118,7 @@ const StudentHome = () => {
               </div>
             ))
           ) : (
-            workshops.map((workshop, index) => (
+            workshops.map((workshop: any, index: number) => (
               <motion.div
                 key={workshop.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -166,49 +135,21 @@ const StudentHome = () => {
                 whileHover={{ y: -8, boxShadow: 'var(--shadow-md)' }}
               >
                 <div style={{ position: 'relative', height: '220px' }}>
-                  <img
-                    src={workshop.image}
-                    alt={workshop.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    top: '16px',
-                    left: '16px',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    padding: '4px 12px',
-                    borderRadius: 'var(--radius-pill)',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    color: 'var(--primary-color)',
-                    backdropFilter: 'blur(4px)'
-                  }}>
-                    {workshop.category}
-                  </div>
-                  {workshop.isPopular && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '16px',
-                      right: '16px',
-                      background: 'var(--warning-color)',
-                      color: 'white',
-                      padding: '4px 12px',
-                      borderRadius: 'var(--radius-pill)',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      <Star size={12} fill="white" /> Popular
-                    </div>
+                  {workshop.thumbnail ? (
+                    <img
+                      src={workshop.thumbnail}
+                      alt={workshop.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div className="shimmer" style={{ width: '100%', height: '100%' }}></div>
                   )}
                 </div>
 
                 <div style={{ padding: '24px' }}>
                   <h3 style={{ fontSize: '20px', marginBottom: '12px', lineHeight: '1.4' }}>{workshop.title}</h3>
-                  <p style={{ color: 'var(--text-body)', fontSize: '15px', marginBottom: '20px', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {workshop.description}
+                  <p style={{ color: 'var(--text-body)', fontSize: '15px', marginBottom: '20px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {workshop.description || 'No description available.'}
                   </p>
 
                   <div style={{
@@ -221,21 +162,21 @@ const StudentHome = () => {
                     borderRadius: 'var(--radius-md)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--text-heading)' }}>
-                      <Calendar size={16} color="var(--primary-color)" /> {workshop.date}
+                      <Calendar size={16} color="var(--primary-color)" /> {new Date(workshop.startTime).toLocaleString()}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--text-heading)' }}>
-                      <MapPin size={16} color="var(--primary-color)" /> {workshop.location}
+                      <MapPin size={16} color="var(--primary-color)" /> {workshop.roomName}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--text-heading)' }}>
-                      <Users size={16} color="var(--primary-color)" /> {workshop.attendees} attendees
+                      <Users size={16} color="var(--primary-color)" /> {workshop.capacity} attendees
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <span style={{ fontSize: '14px', color: 'var(--text-body)' }}>Entry Fee</span>
-                      <div style={{ fontSize: '20px', fontWeight: '700', color: workshop.price === 'Free' ? 'var(--success-color)' : 'var(--text-heading)' }}>
-                        {workshop.price}
+                      <div style={{ fontSize: '20px', fontWeight: '700', color: workshop.priceAmount === 0 ? 'var(--success-color)' : 'var(--text-heading)' }}>
+                        {workshop.priceAmount === 0 ? 'Free' : `${workshop.priceAmount} ${workshop.currency}`}
                       </div>
                     </div>
                     <Link to={`/workshops/${workshop.id}`}>

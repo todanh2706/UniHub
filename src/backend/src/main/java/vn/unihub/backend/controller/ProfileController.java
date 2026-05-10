@@ -8,6 +8,7 @@ import vn.unihub.backend.entity.auth.RoleUpgradeRequest;
 import vn.unihub.backend.entity.auth.User;
 import vn.unihub.backend.repository.auth.RoleUpgradeRequestRepository;
 import vn.unihub.backend.repository.auth.UserRepository;
+import vn.unihub.backend.dto.auth.RoleUpgradeRequestResponse;
 
 import java.util.Map;
 import java.util.Optional;
@@ -56,13 +57,20 @@ public class ProfileController {
     }
 
     @GetMapping("/upgrade-request")
-    public ResponseEntity<?> getMyUpgradeRequest() {
+    public ResponseEntity<RoleUpgradeRequestResponse> getMyUpgradeRequest() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) return ResponseEntity.notFound().build();
 
         // Get the latest request
         return roleUpgradeRequestRepository.findFirstByUserOrderByCreatedAtDesc(userOpt.get())
+                .map(req -> RoleUpgradeRequestResponse.builder()
+                        .id(req.getId())
+                        .requestedRole(req.getRequestedRole())
+                        .status(req.getStatus())
+                        .reason(req.getReason())
+                        .createdAt(req.getCreatedAt())
+                        .build())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.ok().build()); // Return 200 OK empty body if no request
     }

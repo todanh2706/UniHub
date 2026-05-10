@@ -42,6 +42,9 @@ public class Workshop {
     @Column(nullable = false)
     private String title;
 
+    @Column(length = 512)
+    private String thumbnail;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 

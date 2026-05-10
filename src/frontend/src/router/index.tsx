@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import StudentLayout from '../pages/student/Layout';
 import StudentHome from '../pages/student/Home';
 import StudentWorkshopDetails from '../pages/student/WorkshopDetails';
+import AllWorkshops from '../pages/student/AllWorkshops';
 import MyRegistrations from '../pages/student/MyRegistrations';
 
 import AdminLayout from '../pages/admin/Layout';
@@ -29,6 +30,10 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <StudentHome />
+      },
+      {
+        path: 'workshops',
+        element: <AllWorkshops />
       },
       {
         path: 'workshops/:id',

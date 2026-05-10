@@ -18,6 +18,7 @@ const WorkshopForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
+    thumbnail: '',
     description: '',
     eventId: '',
     roomId: '',
@@ -166,6 +167,18 @@ const WorkshopForm: React.FC = () => {
                   value={formData.title}
                   onChange={handleChange}
                   placeholder="e.g. Introduction to React Design Patterns"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div className="form-group">
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px' }}>Thumbnail URL</label>
+                <input 
+                  type="text" 
+                  name="thumbnail"
+                  value={formData.thumbnail}
+                  onChange={handleChange}
+                  placeholder="https://example.com/image.jpg"
                   style={inputStyle}
                 />
               </div>

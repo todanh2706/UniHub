@@ -49,6 +49,7 @@ public class RegistrationService {
     private final PaymentRepository paymentRepository;
     private final PaymentService paymentService;
     private final IdempotencyService idempotencyService;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RegistrationService(
@@ -57,7 +58,8 @@ public class RegistrationService {
             StudentRepository studentRepository,
             PaymentRepository paymentRepository,
             PaymentService paymentService,
-            IdempotencyService idempotencyService
+            IdempotencyService idempotencyService,
+            NotificationService notificationService
     ) {
         this.workshopRepository = workshopRepository;
         this.registrationRepository = registrationRepository;
@@ -65,6 +67,7 @@ public class RegistrationService {
         this.paymentRepository = paymentRepository;
         this.paymentService = paymentService;
         this.idempotencyService = idempotencyService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -176,6 +179,10 @@ public class RegistrationService {
         }
 
         Registration saved = registrationRepository.save(registration);
+        
+        if (!isPaid) {
+            notificationService.sendRegistrationConfirmation(saved);
+        }
 
         // For paid workshops, initiate payment through circuit breaker
         if (isPaid) {
@@ -188,6 +195,7 @@ public class RegistrationService {
                     saved.setConfirmedAt(now);
                     saved.setExpiresAt(null);
                     saved = registrationRepository.save(saved);
+                    notificationService.sendRegistrationConfirmation(saved);
                 }
             } catch (CircuitBreakerService.PaymentGatewayUnavailableException e) {
                 // Payment gateway unavailable - registration stays PENDING_PAYMENT
@@ -265,6 +273,7 @@ public class RegistrationService {
             registration.setCancelledBy(currentUser);
         } else if ("CONFIRMED".equalsIgnoreCase(newStatus)) {
             registration.setConfirmedAt(Instant.now());
+            notificationService.sendRegistrationConfirmation(registration);
         }
         
         Registration saved = registrationRepository.save(registration);

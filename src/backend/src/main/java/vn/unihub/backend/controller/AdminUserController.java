@@ -16,6 +16,7 @@ import vn.unihub.backend.repository.auth.RoleRepository;
 import vn.unihub.backend.entity.auth.UserRole;
 import vn.unihub.backend.entity.auth.UserRoleId;
 import vn.unihub.backend.entity.auth.Role;
+import vn.unihub.backend.dto.auth.RoleUpgradeRequestResponse;
 
 import java.time.Instant;
 import java.util.Map;
@@ -75,13 +76,26 @@ public class AdminUserController {
     }
 
     @GetMapping("/requests")
-    public ResponseEntity<Page<RoleUpgradeRequest>> getUpgradeRequests(
+    public ResponseEntity<Page<RoleUpgradeRequestResponse>> getUpgradeRequests(
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
         String formattedStatus = (status != null && !status.trim().isEmpty()) ? status.trim() : null;
-        return ResponseEntity.ok(roleUpgradeRequestRepository.findWithFilter(formattedStatus, pageable));
+        
+        Page<RoleUpgradeRequest> requests = roleUpgradeRequestRepository.findWithFilter(formattedStatus, pageable);
+        
+        return ResponseEntity.ok(requests.map(req -> RoleUpgradeRequestResponse.builder()
+                .id(req.getId())
+                .user(RoleUpgradeRequestResponse.UserInfo.builder()
+                        .fullName(req.getUser().getFullName())
+                        .email(req.getUser().getEmail())
+                        .build())
+                .requestedRole(req.getRequestedRole())
+                .status(req.getStatus())
+                .reason(req.getReason())
+                .createdAt(req.getCreatedAt())
+                .build()));
     }
 
     @PutMapping("/requests/{id}/process")

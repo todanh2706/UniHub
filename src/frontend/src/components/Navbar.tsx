@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Bell, User, LogOut } from 'lucide-react';
+import { Search, User, LogOut, Briefcase } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
+import { NotificationBell } from './NotificationBell';
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, logout } = useAuthStore();
+  const { isAuthenticated, user, logout } = useAuthStore();
 
   const handleLogout = () => {
     logout();
@@ -16,6 +18,10 @@ const Navbar: React.FC = () => {
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
+  };
+
+  const hasRole = (role: string) => {
+    return user?.roles?.includes(role) || user?.roles?.includes(`ROLE_${role}`);
   };
 
   const getLinkStyle = (path: string) => ({
@@ -59,18 +65,21 @@ const Navbar: React.FC = () => {
           alignItems: 'center',
           gap: '8px'
         }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            background: 'var(--primary-color)',
-            color: 'white',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 'bold',
-            fontSize: '20px'
-          }}>U</div>
+          <motion.div 
+            whileHover={{ rotate: -5, scale: 1.05 }}
+            style={{
+              width: '40px',
+              height: '40px',
+              background: 'var(--primary-color)',
+              color: 'white',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 'bold',
+              fontSize: '20px',
+              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)'
+            }}>U</motion.div>
           <span style={{
             fontSize: '22px',
             fontWeight: '700',
@@ -82,53 +91,72 @@ const Navbar: React.FC = () => {
         {/* Desktop Nav */}
         <nav style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
           <div style={{ display: 'flex', gap: '32px' }}>
-            <Link to="/" style={getLinkStyle('/')}>Workshops</Link>
-            <Link to="/my-registrations" style={getLinkStyle('/my-registrations')}>My Registrations</Link>
-            <Link to="/about" style={getLinkStyle('/about')}>About</Link>
+            <Link to="/" style={getLinkStyle('/')}>
+              Workshops
+              {isActive('/') && (
+                <motion.div 
+                  layoutId="nav-underline"
+                  style={{ position: 'absolute', bottom: '-12px', left: 0, right: 0, height: '2px', background: 'var(--primary-color)', borderRadius: '2px' }} 
+                />
+              )}
+            </Link>
+            <Link to="/my-registrations" style={getLinkStyle('/my-registrations')}>
+              My Registrations
+              {isActive('/my-registrations') && (
+                <motion.div 
+                  layoutId="nav-underline"
+                  style={{ position: 'absolute', bottom: '-12px', left: 0, right: 0, height: '2px', background: 'var(--primary-color)', borderRadius: '2px' }} 
+                />
+              )}
+            </Link>
+            {hasRole('ORGANIZER') && (
+              <Link to="/organizer" style={getLinkStyle('/organizer')}>
+                Organizer
+                {isActive('/organizer') && (
+                  <motion.div 
+                    layoutId="nav-underline"
+                    style={{ position: 'absolute', bottom: '-12px', left: 0, right: 0, height: '2px', background: 'var(--primary-color)', borderRadius: '2px' }} 
+                  />
+                )}
+              </Link>
+            )}
+            <Link to="/about" style={getLinkStyle('/about')}>
+              About
+              {isActive('/about') && (
+                <motion.div 
+                  layoutId="nav-underline"
+                  style={{ position: 'absolute', bottom: '-12px', left: 0, right: 0, height: '2px', background: 'var(--primary-color)', borderRadius: '2px' }} 
+                />
+              )}
+            </Link>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button style={{
-              background: 'var(--neutral-100)',
-              border: 'none',
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-body)'
-            }}>
-              <Search size={20} />
-            </button>
-            <button style={{
-              background: 'var(--neutral-100)',
-              border: 'none',
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-body)',
-              position: 'relative'
-            }}>
-              <Bell size={20} />
-              <span style={{
-                position: 'absolute',
-                top: '10px',
-                right: '10px',
-                width: '8px',
-                height: '8px',
-                background: 'var(--danger-color)',
+            <motion.button 
+              whileHover={{ scale: 1.05, backgroundColor: 'var(--neutral-200)' }}
+              whileTap={{ scale: 0.95 }}
+              style={{
+                background: 'var(--neutral-100)',
+                border: 'none',
+                width: '40px',
+                height: '40px',
                 borderRadius: '50%',
-                border: '2px solid white'
-              }}></span>
-            </button>
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-body)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}>
+              <Search size={20} />
+            </motion.button>
+            <NotificationBell />
             <div style={{ width: '1px', height: '24px', background: 'var(--neutral-200)', margin: '0 8px' }}></div>
             {isAuthenticated ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <motion.button
+                  whileHover={{ scale: 1.05, backgroundColor: 'var(--neutral-200)' }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => navigate('/profile')}
                   style={{
                     background: 'var(--neutral-100)',
@@ -144,29 +172,38 @@ const Navbar: React.FC = () => {
                     transition: 'all 0.2s ease',
                     boxShadow: isActive('/profile') ? '0 0 0 2px var(--primary-color)' : 'none'
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.background = 'var(--neutral-200)'}
-                  onMouseOut={(e) => e.currentTarget.style.background = 'var(--neutral-100)'}
                 >
                   <User size={20} />
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={handleLogout}
                   className="btn btn-danger"
-                  style={{ padding: '8px 14px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{ 
+                    padding: '8px 16px', 
+                    fontSize: '13px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    borderRadius: 'var(--radius-sm)'
+                  }}
                   title="Sign Out"
                 >
                   <LogOut size={16} />
                   <span>Sign Out</span>
-                </button>
+                </motion.button>
               </div>
             ) : (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02, boxShadow: 'var(--shadow-md)' }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => navigate('/login')}
                 className="btn btn-primary"
-                style={{ padding: '8px 20px', fontSize: '14px' }}
+                style={{ padding: '8px 24px', fontSize: '14px' }}
               >
                 Sign In
-              </button>
+              </motion.button>
             )}
           </div>
         </nav>
@@ -176,3 +213,5 @@ const Navbar: React.FC = () => {
 };
 
 export default Navbar;
+
+

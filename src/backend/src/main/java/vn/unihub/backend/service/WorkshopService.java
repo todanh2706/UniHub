@@ -45,6 +45,12 @@ public class WorkshopService {
     }
 
     @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<WorkshopResponse> getPublicWorkshops(String keyword, String status, org.springframework.data.domain.Pageable pageable) {
+        return workshopRepository.searchPublicWorkshops(keyword, status, pageable)
+                .map(this::mapToResponse);
+    }
+
+    @Transactional(readOnly = true)
     public WorkshopResponse getWorkshopById(UUID id) {
         Workshop workshop = workshopRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Workshop not found"));
@@ -60,6 +66,7 @@ public class WorkshopService {
 
         Workshop workshop = Workshop.builder()
                 .title(request.getTitle())
+                .thumbnail(request.getThumbnail())
                 .description(request.getDescription())
                 .event(event)
                 .room(room)
@@ -88,6 +95,7 @@ public class WorkshopService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
 
         workshop.setTitle(request.getTitle());
+        workshop.setThumbnail(request.getThumbnail());
         workshop.setDescription(request.getDescription());
         workshop.setEvent(event);
         workshop.setRoom(room);
@@ -118,6 +126,7 @@ public class WorkshopService {
         return WorkshopResponse.builder()
                 .id(workshop.getId())
                 .title(workshop.getTitle())
+                .thumbnail(workshop.getThumbnail())
                 .description(workshop.getDescription())
                 .eventId(workshop.getEvent().getId())
                 .eventName(workshop.getEvent().getName())

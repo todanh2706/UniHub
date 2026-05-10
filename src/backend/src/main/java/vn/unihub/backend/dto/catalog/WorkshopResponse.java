@@ -12,6 +12,7 @@ import java.util.UUID;
 public class WorkshopResponse {
     private UUID id;
     private String title;
+    private String thumbnail;
     private String description;
     private UUID eventId;
     private String eventName;
