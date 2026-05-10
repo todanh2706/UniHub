@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
 
+html {
+  scrollbar-gutter: stable;
+}
+
 :root {
   /* Primary Colors - Modern Indigo */
   --primary-color: #4F46E5;
@@ -111,6 +115,16 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-secondary:hover:not(:disabled) {
   background-color: var(--secondary-hover);
+}
+
+.btn-danger {
+  background-color: var(--danger-color);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(0.9);
+  box-shadow: 0 4px 6px -1px rgba(225, 29, 72, 0.2);
 }
 
 .animate-fade-in {

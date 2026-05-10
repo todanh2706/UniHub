@@ -223,65 +223,83 @@ const CheckinPortal: React.FC = () => {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
-            backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex',
-            flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            padding: '24px'
           }}
         >
-          <button onClick={stopScanner} style={{
-            position: 'absolute', top: '24px', right: '24px',
-            background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%',
-            width: '48px', height: '48px', cursor: 'pointer', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', color: 'white',
-            zIndex: 10000, transition: 'background 0.2s'
-          }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-             onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}>
-            <X size={28} />
-          </button>
-
-          <div style={{
-            width: '100%', maxWidth: '420px', padding: '24px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px'
-          }}>
-            <div style={{ width: '100%', textAlign: 'center', marginBottom: '8px' }}>
-              <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                <Camera size={26} /> Quét mã QR
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            style={{
+              position: 'relative',
+              width: '100%', maxWidth: '420px',
+              backgroundColor: 'white',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              overflow: 'hidden',
+              display: 'flex', flexDirection: 'column'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '16px 20px', borderBottom: '1px solid var(--neutral-100, #f1f5f9)',
+              backgroundColor: 'white', zIndex: 10
+            }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: 'var(--text-heading, #1e293b)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Camera size={20} color="var(--primary-color, #6366f1)" /> 
+                Quét mã QR Check-in
               </h2>
+              <button onClick={stopScanner} style={{
+                background: 'var(--neutral-100, #f1f5f9)', border: 'none', borderRadius: '50%',
+                width: '36px', height: '36px', cursor: 'pointer', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', color: 'var(--text-body, #64748b)',
+                transition: 'all 0.2s ease'
+              }} onMouseOver={(e) => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.transform = 'rotate(90deg)'; }}
+                 onMouseOut={(e) => { e.currentTarget.style.background = 'var(--neutral-100, #f1f5f9)'; e.currentTarget.style.color = 'var(--text-body, #64748b)'; e.currentTarget.style.transform = 'none'; }}>
+                <X size={20} />
+              </button>
             </div>
 
-            <div style={{
-              width: '100%', aspectRatio: '1', borderRadius: '20px', overflow: 'hidden',
-              border: '3px solid rgba(99,102,241,0.6)',
-              boxShadow: '0 0 30px rgba(99,102,241,0.3)',
-            }}>
-              <div id={scannerContainerId} style={{ width: '100%', height: '100%' }} />
+            {/* Camera Area */}
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '1', backgroundColor: '#000' }}>
+              {!scannerReady && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', fontSize: '15px', fontWeight: 500, zIndex: 1 }}>
+                  <RefreshCw size={20} className="animate-spin" style={{ marginRight: '8px' }} />
+                  Đang khởi động Camera...
+                </div>
+              )}
+              <div id={scannerContainerId} style={{ width: '100%', height: '100%', position: 'relative', zIndex: 2 }} />
             </div>
 
-            {!scannerReady && (
-              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>
-                Đang khởi tạo camera...
-              </p>
-            )}
-
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px',
-              borderRadius: '10px', fontSize: '13px', fontWeight: 600,
-              backgroundColor: isOnline ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
-              color: isOnline ? '#6ee7b7' : '#fbbf24',
-            }}>
-              {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
-              {isOnline ? 'Online — đồng bộ tự động' : 'Offline — dữ liệu lưu tại máy'}
-            </div>
-
-            {pendingCount > 0 && (
+            {/* Footer Status */}
+            <div style={{ padding: '16px 20px', backgroundColor: 'var(--neutral-50, #f8fafc)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{
-                fontSize: '13px', color: 'rgba(255,255,255,0.5)',
-                display: 'flex', alignItems: 'center', gap: '6px'
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px',
+                borderRadius: '12px', fontSize: '13px', fontWeight: 600,
+                backgroundColor: isOnline ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                color: isOnline ? 'var(--success-color, #10b981)' : 'var(--warning-color, #f59e0b)',
               }}>
-                <Database size={14} />
-                {pendingCount} bản ghi chờ đồng bộ
+                {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
+                {isOnline ? 'Online — Tự động đồng bộ' : 'Offline — Đang lưu tạm trên máy'}
               </div>
-            )}
-          </div>
+
+              {pendingCount > 0 && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  fontSize: '12px', color: 'var(--text-body, #64748b)', fontWeight: 500
+                }}>
+                  <Database size={14} />
+                  {pendingCount} bản ghi chờ đồng bộ lên hệ thống
+                </div>
+              )}
+            </div>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

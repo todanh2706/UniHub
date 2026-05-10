@@ -1,169 +1,20 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Search, Bell, User, LogOut } from 'lucide-react';
-import { useAuthStore } from '../../store/authStore';
-
+import { Outlet } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import Navbar from '../../components/Navbar';
 
 const StudentLayout = () => {
-  const navigate = useNavigate();
-  const { isAuthenticated, logout } = useAuthStore();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
   return (
     <div className="app-layout" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        zIndex: 50,
-        background: 'rgba(255, 255, 255, 0.8)',
-        backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid var(--neutral-200)',
-        height: '72px',
-        display: 'flex',
-        alignItems: 'center'
-      }}>
-        <div style={{ 
-          maxWidth: '1280px', 
-          margin: '0 auto', 
-          width: '100%', 
-          padding: '0 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          {/* Logo */}
-          <Link to="/" style={{ 
-            textDecoration: 'none', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px' 
-          }}>
-            <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              background: 'var(--primary-color)', 
-              color: 'white', 
-              borderRadius: '10px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              fontWeight: 'bold',
-              fontSize: '20px'
-            }}>U</div>
-            <span style={{ 
-              fontSize: '22px', 
-              fontWeight: '700', 
-              color: 'var(--text-heading)',
-              fontFamily: 'var(--font-display)'
-            }}>UniHub</span>
-          </Link>
-
-          {/* Desktop Nav */}
-          <nav style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-            <div style={{ display: 'flex', gap: '32px' }}>
-              <Link to="/" style={{ color: 'var(--primary-color)', fontWeight: '600', textDecoration: 'none' }}>Workshops</Link>
-              <Link to="/my-registrations" style={{ color: 'var(--text-body)', fontWeight: '500', textDecoration: 'none' }}>My Bookings</Link>
-              <Link to="/about" style={{ color: 'var(--text-body)', fontWeight: '500', textDecoration: 'none' }}>About</Link>
-            </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <button style={{ 
-                background: 'var(--neutral-100)', 
-                border: 'none', 
-                width: '40px', 
-                height: '40px', 
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-body)'
-              }}>
-                <Search size={20} />
-              </button>
-              <button style={{ 
-                background: 'var(--neutral-100)', 
-                border: 'none', 
-                width: '40px', 
-                height: '40px', 
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-body)',
-                position: 'relative'
-              }}>
-                <Bell size={20} />
-                <span style={{ 
-                  position: 'absolute', 
-                  top: '10px', 
-                  right: '10px', 
-                  width: '8px', 
-                  height: '8px', 
-                  background: 'var(--danger-color)', 
-                  borderRadius: '50%',
-                  border: '2px solid white'
-                }}></span>
-              </button>
-              <div style={{ width: '1px', height: '24px', background: 'var(--neutral-200)', margin: '0 8px' }}></div>
-              {isAuthenticated ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button 
-                  onClick={() => navigate('/profile')}
-                  style={{ 
-                    background: 'var(--neutral-100)', 
-                    border: 'none', 
-                    width: '40px', 
-                    height: '40px', 
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--primary-color)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.background = 'var(--neutral-200)'}
-                  onMouseOut={(e) => e.currentTarget.style.background = 'var(--neutral-100)'}
-                >
-                  <User size={20} />
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="btn btn-secondary"
-                  style={{ padding: '8px 14px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  title="Sign Out"
-                >
-                  <LogOut size={16} />
-                  <span>Sign Out</span>
-                </button>
-                </div>
-              ) : (
-                <button 
-                  onClick={() => navigate('/login')}
-                  className="btn btn-primary" 
-                  style={{ padding: '8px 20px', fontSize: '14px' }}
-                >
-                  Sign In
-                </button>
-              )}
-            </div>
-          </nav>
-        </div>
-      </header>
+      <Navbar />
 
       <main style={{ flex: '1', paddingTop: '72px' }}>
         <Outlet />
       </main>
 
-      <footer style={{ 
-        background: 'var(--surface-color)', 
-        borderTop: '1px solid var(--neutral-200)', 
-        padding: '48px 24px 24px' 
+      <footer style={{
+        background: 'var(--surface-color)',
+        borderTop: '1px solid var(--neutral-200)',
+        padding: '48px 24px 24px'
       }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '40px' }}>
           <div>
