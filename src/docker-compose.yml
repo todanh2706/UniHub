@@ -1,3 +1,5 @@
+name: unihub
+
 services:
   postgres:
     image: postgres:16
@@ -53,6 +55,8 @@ services:
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
       SERVER_PORT: 8080
       CSV_SYNC_DIR: /app/data/csv
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
     volumes:
       - ./data/csv:/app/data/csv
     ports:
@@ -86,6 +90,16 @@ services:
       - CI=false
     tty: true
     stdin_open: true
+
+  mailhog:
+    image: mailhog/mailhog
+    container_name: unihub-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+    networks:
+      - app
 
 networks:
   app:
