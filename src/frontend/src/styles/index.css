@@ -32,10 +32,16 @@ html {
   --text-body: #475569;
   
   /* Shapes */
+  --radius-xl: 24px;
   --radius-lg: 16px;
   --radius-md: 12px;
   --radius-sm: 8px;
   --radius-pill: 9999px;
+  
+  /* Light variants for backgrounds */
+  --primary-light: #EEF2FF;
+  --success-light: #ECFDF5;
+  --danger-light: #FFF1F2;
   
   /* Shadows */
   --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05);

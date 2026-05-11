@@ -670,7 +670,7 @@ const MyRegistrations = () => {
                     }}
                   >
                     <img
-                      src={`${api.defaults.baseURL}/registrations/${selectedReg.id}/qr-code`}
+                      src={`${api.defaults.baseURL}/public/registrations/qr/${selectedReg.qrToken}`}
                       alt={`QR code for ${selectedReg.workshopTitle}`}
                       style={{
                         width: '180px',
@@ -689,11 +689,10 @@ const MyRegistrations = () => {
                     <button
                       onClick={async () => {
                         try {
-                          const response = await fetch(`${api.defaults.baseURL}/registrations/${selectedReg.id}/qr-code`, {
-                            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                          const response = await api.get(`/public/registrations/qr/${selectedReg.qrToken}`, {
+                            responseType: 'blob'
                           });
-                          const blob = await response.blob();
-                          const url = URL.createObjectURL(blob);
+                          const url = URL.createObjectURL(response.data);
                           const a = document.createElement('a');
                           a.href = url;
                           a.download = `qr-${selectedReg.workshopTitle.replace(/\s+/g, '-').toLowerCase()}.png`;

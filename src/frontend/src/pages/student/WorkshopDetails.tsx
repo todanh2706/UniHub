@@ -1,261 +1,436 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, MapPin, Users, Clock, ShieldCheck, Share2, Info, CheckCircle2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { 
+  Calendar, 
+  MapPin, 
+  Users, 
+  Clock, 
+  ShieldCheck, 
+  Share2, 
+  Info, 
+  CheckCircle2, 
+  AlertCircle,
+  ChevronLeft,
+  ArrowRight,
+  Ticket
+} from 'lucide-react';
+import api from '../../api/axios';
+import { useAuthStore } from '../../store/authStore';
+import '../../styles/Skeleton.css';
+
+interface WorkshopDetail {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  startTime: string;
+  endTime: string;
+  registrationOpensAt: string;
+  registrationClosesAt: string;
+  capacity: number;
+  activeSeats: number;
+  remainingSeats: number;
+  registrable: boolean;
+  priceAmount: number;
+  currency: string;
+  roomId: string;
+  roomName: string;
+  eventId: string;
+  eventName: string;
+  thumbnail?: string;
+}
+
+interface Registration {
+  id: string;
+  workshopId: string;
+  workshopTitle: string;
+  status: string;
+  qrToken: string;
+  qrPayload: string;
+  createdAt: string;
+}
 
 const WorkshopDetails: React.FC = () => {
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { isAuthenticated, user } = useAuthStore();
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!showPayment) return;
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [showPayment]);
+  // Fetch workshop details
+  const { data: workshop, isLoading, isError } = useQuery<WorkshopDetail>({
+    queryKey: ['workshop', id],
+    queryFn: async () => {
+      const response = await api.get(`/workshops/${id}`);
+      return response.data;
+    },
+    enabled: !!id
+  });
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  // Fetch my registrations to check if already registered
+  const { data: myRegistrations } = useQuery<Registration[]>({
+    queryKey: ['my-registrations'],
+    queryFn: async () => {
+      const response = await api.get('/registrations/me');
+      return response.data;
+    },
+    enabled: isAuthenticated && !!id
+  });
+
+  const isAlreadyRegistered = myRegistrations?.some(r => r.workshopId === id && r.status !== 'CANCELLED');
+  const existingRegistration = myRegistrations?.find(r => r.workshopId === id && r.status !== 'CANCELLED');
+
+  // Registration mutation
+  const registerMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/registrations', { workshopId: id });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-registrations'] });
+      queryClient.invalidateQueries({ queryKey: ['workshop', id] });
+      navigate('/my-registrations');
+    },
+    onError: (err: any) => {
+      const message = err.response?.data?.message || 'Failed to register for the workshop. Please try again.';
+      setError(message);
+    }
+  });
 
   const handleRegister = () => {
-    setIsRegistering(true);
-    setTimeout(() => {
-      setIsRegistering(false);
-      setShowPayment(true);
-    }, 1500);
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: `/workshops/${id}` } });
+      return;
+    }
+    setError(null);
+    registerMutation.mutate();
   };
 
-  const isLowTime = timeLeft < 180; // Less than 3 minutes
+  if (isLoading) {
+    return (
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '40px 24px' }}>
+        <div className="shimmer" style={{ height: '32px', width: '200px', marginBottom: '24px', borderRadius: 'var(--radius-sm)' }}></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '40px' }}>
+          <div>
+            <div className="shimmer" style={{ height: '400px', width: '100%', borderRadius: 'var(--radius-lg)', marginBottom: '32px' }}></div>
+            <div className="shimmer" style={{ height: '48px', width: '70%', marginBottom: '24px' }}></div>
+            <div className="shimmer" style={{ height: '100px', width: '100%', borderRadius: 'var(--radius-md)' }}></div>
+          </div>
+          <div className="shimmer" style={{ height: '400px', width: '100%', borderRadius: 'var(--radius-lg)' }}></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !workshop) {
+    return (
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '100px 24px', textAlign: 'center' }}>
+        <AlertCircle size={64} color="var(--danger-color)" style={{ marginBottom: '24px' }} />
+        <h1 style={{ fontSize: '32px', marginBottom: '16px' }}>Workshop Not Found</h1>
+        <p style={{ color: 'var(--text-body)', marginBottom: '32px' }}>The workshop you are looking for does not exist or has been removed.</p>
+        <Link to="/workshops" className="btn btn-primary">Back to Workshops</Link>
+      </div>
+    );
+  }
+
+  const startDate = new Date(workshop.startTime);
+  const endDate = new Date(workshop.endTime);
+  const isExpired = new Date() > new Date(workshop.registrationClosesAt);
+  const isFull = workshop.remainingSeats <= 0;
+  const isNotYetOpen = new Date() < new Date(workshop.registrationOpensAt);
 
   return (
-    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '40px 24px' }}>
-      {/* Breadcrumbs */}
-      <div style={{ marginBottom: '24px', fontSize: '14px', color: 'var(--text-body)' }}>
-        <Link to="/" style={{ color: 'var(--text-body)', textDecoration: 'none' }}>Home</Link>
-        <span style={{ margin: '0 8px' }}>/</span>
-        <Link to="/workshops" style={{ color: 'var(--text-body)', textDecoration: 'none' }}>Workshops</Link>
-        <span style={{ margin: '0 8px' }}>/</span>
-        <span style={{ color: 'var(--primary-color)', fontWeight: '600' }}>AI & Machine Learning</span>
-      </div>
+    <div style={{ background: 'var(--bg-color)', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '40px 24px' }}>
+        {/* Breadcrumbs & Navigation */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+            <Link to="/workshops" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-body)', textDecoration: 'none', gap: '4px', fontWeight: '500' }}>
+              <ChevronLeft size={16} /> Back to Workshops
+            </Link>
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}>
+              <Share2 size={16} /> Share
+            </button>
+          </div>
+        </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '40px' }}>
-        {/* Main Content */}
-        <div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '48px', alignItems: 'start' }}>
+          {/* Main Content */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            style={{ 
-              background: 'var(--surface-color)', 
-              borderRadius: 'var(--radius-lg)', 
-              overflow: 'hidden',
-              border: '1px solid var(--neutral-200)',
-              boxShadow: 'var(--shadow-sm)'
-            }}
+            style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}
           >
-            <div style={{ height: '400px', width: '100%' }}>
-              <img 
-                src="https://images.unsplash.com/photo-1591453089816-0fbb971b454c?auto=format&fit=crop&q=80&w=1200" 
-                alt="Workshop" 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            </div>
-            
-            <div style={{ padding: '40px' }}>
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                <span style={{ background: 'var(--neutral-100)', color: 'var(--text-body)', padding: '4px 12px', borderRadius: 'var(--radius-pill)', fontSize: '12px', fontWeight: '600' }}>Technology</span>
-                <span style={{ background: '#ECFDF5', color: '#059669', padding: '4px 12px', borderRadius: 'var(--radius-pill)', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <ShieldCheck size={14} /> Certified
-                </span>
+            {/* Header Image/Card */}
+            <div style={{ 
+              background: 'var(--surface-color)', 
+              borderRadius: 'var(--radius-xl)', 
+              overflow: 'hidden',
+              boxShadow: 'var(--shadow-lg)',
+              border: '1px solid var(--neutral-200)'
+            }}>
+              <div style={{ height: '450px', width: '100%', position: 'relative' }}>
+                <img 
+                  src={workshop.thumbnail || `https://images.unsplash.com/photo-1591453089816-0fbb971b454c?auto=format&fit=crop&q=80&w=1200`} 
+                  alt={workshop.title} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <div style={{ 
+                  position: 'absolute', 
+                  top: '24px', 
+                  left: '24px', 
+                  display: 'flex', 
+                  gap: '12px' 
+                }}>
+                  <span style={{ 
+                    background: 'rgba(255, 255, 255, 0.9)', 
+                    backdropFilter: 'blur(4px)',
+                    color: 'var(--text-heading)', 
+                    padding: '6px 16px', 
+                    borderRadius: 'var(--radius-pill)', 
+                    fontSize: '13px', 
+                    fontWeight: '700',
+                    boxShadow: 'var(--shadow-sm)'
+                  }}>
+                    {workshop.eventName}
+                  </span>
+                  {workshop.priceAmount === 0 && (
+                    <span style={{ 
+                      background: 'var(--success-color)', 
+                      color: 'white', 
+                      padding: '6px 16px', 
+                      borderRadius: 'var(--radius-pill)', 
+                      fontSize: '13px', 
+                      fontWeight: '700',
+                      boxShadow: 'var(--shadow-sm)'
+                    }}>
+                      Free Entry
+                    </span>
+                  )}
+                </div>
               </div>
-
-              <h1 style={{ fontSize: '36px', marginBottom: '16px' }}>AI & Machine Learning: Building the Future</h1>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', padding: '24px', background: 'var(--neutral-100)', borderRadius: 'var(--radius-md)', marginBottom: '32px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Calendar className="icon" style={{ color: 'var(--primary-color)' }} />
-                  <div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-body)' }}>Date</div>
-                    <div style={{ fontWeight: '600' }}>Oct 20, 2026</div>
+              <div style={{ padding: '48px' }}>
+                <h1 style={{ fontSize: '42px', fontWeight: '800', color: 'var(--text-heading)', marginBottom: '24px', lineHeight: '1.2' }}>
+                  {workshop.title}
+                </h1>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '40px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                    <div style={{ background: 'var(--primary-light)', padding: '12px', borderRadius: 'var(--radius-md)' }}>
+                      <Calendar className="icon" style={{ color: 'var(--primary-color)' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-body)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</div>
+                      <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text-heading)' }}>
+                        {startDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                    <div style={{ background: 'var(--primary-light)', padding: '12px', borderRadius: 'var(--radius-md)' }}>
+                      <Clock className="icon" style={{ color: 'var(--primary-color)' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-body)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Time</div>
+                      <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text-heading)' }}>
+                        {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                    <div style={{ background: 'var(--primary-light)', padding: '12px', borderRadius: 'var(--radius-md)' }}>
+                      <MapPin className="icon" style={{ color: 'var(--primary-color)' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-body)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Location</div>
+                      <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text-heading)' }}>{workshop.roomName}</div>
+                    </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Clock className="icon" style={{ color: 'var(--primary-color)' }} />
-                  <div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-body)' }}>Time</div>
-                    <div style={{ fontWeight: '600' }}>09:00 - 16:00</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <MapPin className="icon" style={{ color: 'var(--primary-color)' }} />
-                  <div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-body)' }}>Location</div>
-                    <div style={{ fontWeight: '600' }}>Lab 302, Sci Bldg</div>
-                  </div>
-                </div>
-              </div>
 
-              <div style={{ fontSize: '18px', color: 'var(--text-body)', lineHeight: '1.8' }}>
-                <p style={{ marginBottom: '20px' }}>
-                  Dive into the world of Artificial Intelligence and Machine Learning in this intensive one-day workshop. 
-                  Designed for students who want to move beyond theory and build real-world applications.
-                </p>
-                <h3 style={{ color: 'var(--text-heading)', marginBottom: '16px' }}>What you will learn:</h3>
-                <ul style={{ listStyle: 'none', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '16px' }}>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CheckCircle2 size={18} color="var(--success-color)" /> Neural Network Basics
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CheckCircle2 size={18} color="var(--success-color)" /> PyTorch Fundamentals
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CheckCircle2 size={18} color="var(--success-color)" /> Data Preprocessing
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CheckCircle2 size={18} color="var(--success-color)" /> Model Deployment
-                  </li>
-                </ul>
+                <div style={{ borderTop: '1px solid var(--neutral-200)', paddingTop: '40px' }}>
+                  <h3 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-heading)', marginBottom: '20px' }}>About this Workshop</h3>
+                  <div style={{ fontSize: '18px', color: 'var(--text-body)', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
+                    {workshop.description}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '40px', padding: '24px', background: 'var(--neutral-100)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <ShieldCheck size={40} color="var(--primary-color)" />
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '18px', color: 'var(--text-heading)' }}>Certified Workshop</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '14px', color: 'var(--text-body)' }}>Complete this workshop to earn a participation certificate from UniHub.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </motion.div>
-        </div>
 
-        {/* Sidebar / Registration */}
-        <div>
-          <AnimatePresence mode="wait">
-            {!showPayment ? (
-              <motion.div
-                key="register"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                style={{ 
-                  background: 'var(--surface-color)', 
-                  padding: '32px', 
-                  borderRadius: 'var(--radius-lg)', 
-                  border: '1px solid var(--neutral-200)',
-                  boxShadow: 'var(--shadow-md)',
-                  position: 'sticky',
-                  top: '112px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                  <span style={{ fontSize: '16px', color: 'var(--text-body)' }}>Registration Fee</span>
-                  <span style={{ fontSize: '32px', fontWeight: '700', color: 'var(--text-heading)' }}>$20.00</span>
+          {/* Sidebar / Registration */}
+          <aside style={{ position: 'sticky', top: '112px' }}>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              style={{ 
+                background: 'var(--surface-color)', 
+                padding: '40px', 
+                borderRadius: 'var(--radius-xl)', 
+                border: '1px solid var(--neutral-200)',
+                boxShadow: 'var(--shadow-xl)'
+              }}
+            >
+              <div style={{ marginBottom: '32px' }}>
+                <div style={{ fontSize: '14px', color: 'var(--text-body)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '8px' }}>Registration Fee</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                  <span style={{ fontSize: '42px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                    {workshop.priceAmount === 0 ? 'FREE' : `${workshop.priceAmount}`}
+                  </span>
+                  {workshop.priceAmount > 0 && <span style={{ fontSize: '18px', color: 'var(--text-body)', fontWeight: '600' }}>{workshop.currency}</span>}
                 </div>
+              </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#FEF3C7', borderRadius: 'var(--radius-sm)', color: '#92400E', fontSize: '14px', marginBottom: '24px' }}>
-                  <Users size={18} /> <span>Only 12 seats left!</span>
-                </div>
-
-                <button 
-                  onClick={handleRegister}
-                  disabled={isRegistering}
-                  className={`btn btn-primary ${isRegistering ? 'loading' : ''}`}
-                  style={{ width: '100%', padding: '16px', fontSize: '18px', fontWeight: '600' }}
-                >
-                  {isRegistering ? (
-                    <>
-                      <div className="spinner" style={{ width: '20px', height: '20px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
-                      Processing...
-                    </>
-                  ) : 'Register Now'}
-                </button>
-
-                <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: 'var(--text-body)' }}>
-                    <Info size={16} /> Secure payment via Stripe
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: 'var(--text-body)' }}>
-                    <Share2 size={16} /> Share with friends
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="payment"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                style={{ 
-                  background: 'var(--surface-color)', 
-                  padding: '32px', 
-                  borderRadius: 'var(--radius-lg)', 
-                  border: '1px solid var(--danger-color)',
-                  boxShadow: '0 20px 25px -5px rgba(225, 29, 72, 0.1)',
-                  position: 'sticky',
-                  top: '112px'
-                }}
-              >
-                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              {isAlreadyRegistered ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div style={{ 
-                    fontSize: '14px', 
-                    fontWeight: '600', 
-                    color: isLowTime ? 'var(--danger-color)' : 'var(--warning-color)',
-                    marginBottom: '8px',
+                    padding: '24px', 
+                    background: 'var(--success-light)', 
+                    borderRadius: 'var(--radius-lg)', 
+                    border: '1px solid var(--success-color)',
+                    color: 'var(--success-color)',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px'
-                  }} className={isLowTime ? 'pulse-effect' : ''}>
-                    <Clock size={16} /> {isLowTime ? 'URGENT: PAYMENT EXPIRES IN' : 'TIME REMAINING TO PAY'}
-                  </div>
-                  <div style={{ 
-                    fontSize: '48px', 
-                    fontWeight: '800', 
-                    fontFamily: 'var(--font-display)',
-                    color: isLowTime ? 'var(--danger-color)' : 'var(--text-heading)'
+                    textAlign: 'center',
+                    gap: '12px'
                   }}>
-                    {formatTime(timeLeft)}
+                    <CheckCircle2 size={40} />
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '18px' }}>You are registered!</div>
+                      <div style={{ fontSize: '14px', opacity: 0.9 }}>Your ticket is confirmed. See you there!</div>
+                    </div>
                   </div>
+                  <Link to="/my-registrations" className="btn btn-primary" style={{ width: '100%', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <Ticket size={20} /> View My Ticket
+                  </Link>
                 </div>
-
-                <div style={{ borderTop: '1px solid var(--neutral-200)', paddingTop: '24px', marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <span>Workshop Fee</span>
-                    <span>$20.00</span>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
+                      <span style={{ color: 'var(--text-body)' }}>Total Capacity</span>
+                      <span style={{ fontWeight: '700', color: 'var(--text-heading)' }}>{workshop.capacity}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
+                      <span style={{ color: 'var(--text-body)' }}>Available Seats</span>
+                      <span style={{ fontWeight: '700', color: isFull ? 'var(--danger-color)' : 'var(--success-color)' }}>
+                        {workshop.remainingSeats} left
+                      </span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: 'var(--neutral-200)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
+                      <div style={{ 
+                        width: `${(workshop.activeSeats / workshop.capacity) * 100}%`, 
+                        height: '100%', 
+                        background: isFull ? 'var(--danger-color)' : 'var(--primary-color)',
+                        transition: 'width 1s ease-out'
+                      }}></div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '18px' }}>
-                    <span>Total Due</span>
-                    <span>$20.00</span>
+
+                  {error && (
+                    <div style={{ 
+                      padding: '16px', 
+                      background: '#FFF1F2', 
+                      color: 'var(--danger-color)', 
+                      borderRadius: 'var(--radius-md)', 
+                      fontSize: '14px', 
+                      marginBottom: '24px',
+                      display: 'flex',
+                      gap: '12px',
+                      alignItems: 'flex-start',
+                      border: '1px solid #FECDD3'
+                    }}>
+                      <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  <button 
+                    onClick={handleRegister}
+                    disabled={registerMutation.isPending || isFull || isExpired || isNotYetOpen || (isAuthenticated && !user?.roles?.includes('STUDENT'))}
+                    className={`btn btn-primary ${registerMutation.isPending ? 'loading' : ''}`}
+                    style={{ 
+                      width: '100%', 
+                      padding: '18px', 
+                      fontSize: '18px', 
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '12px',
+                      boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.25)'
+                    }}
+                  >
+                    {registerMutation.isPending ? 'Processing...' : 
+                     isFull ? 'Workshop Full' : 
+                     isExpired ? 'Registration Closed' :
+                     isNotYetOpen ? 'Registration Not Yet Open' :
+                     'Secure My Spot'}
+                    {!registerMutation.isPending && !isFull && !isExpired && !isNotYetOpen && <ArrowRight size={20} />}
+                  </button>
+
+                  <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: 'var(--text-body)' }}>
+                      <Info size={16} color="var(--primary-color)" />
+                      <span>Registration closes on {new Date(workshop.registrationClosesAt).toLocaleDateString()}</span>
+                    </div>
+                    {!isAuthenticated && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: 'var(--text-body)', padding: '12px', background: 'var(--primary-light)', borderRadius: 'var(--radius-md)' }}>
+                        <Users size={16} color="var(--primary-color)" />
+                        <span>Sign in as a student to register for this workshop</span>
+                      </div>
+                    )}
+                    {isAuthenticated && !user?.roles?.includes('STUDENT') && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: 'var(--danger-color)', padding: '12px', background: 'var(--danger-light)', borderRadius: 'var(--radius-md)' }}>
+                        <AlertCircle size={16} />
+                        <span>Only students can register for workshops.</span>
+                      </div>
+                    )}
                   </div>
-                </div>
+                </>
+              )}
+            </motion.div>
 
-                <button className="btn btn-primary" style={{ width: '100%', padding: '16px' }}>
-                  Pay Now
-                </button>
-
-                <button 
-                  onClick={() => setShowPayment(false)}
-                  style={{ width: '100%', background: 'none', border: 'none', marginTop: '16px', color: 'var(--neutral-400)', fontSize: '14px', cursor: 'pointer' }}
-                >
-                  Cancel Registration
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            {/* Additional Info Box */}
+            <div style={{ 
+              marginTop: '24px', 
+              padding: '32px', 
+              background: 'linear-gradient(135deg, var(--primary-color) 0%, #1e40af 100%)', 
+              borderRadius: 'var(--radius-xl)',
+              color: 'white'
+            }}>
+              <h4 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: '700' }}>Need help?</h4>
+              <p style={{ margin: '0 0 20px', fontSize: '14px', opacity: 0.9 }}>If you have any questions about this workshop or the registration process, please contact the organizer.</p>
+              <button style={{ 
+                background: 'rgba(255, 255, 255, 0.2)', 
+                border: '1px solid rgba(255, 255, 255, 0.4)',
+                color: 'white',
+                padding: '10px 20px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}>
+                Contact Organizer
+              </button>
+            </div>
+          </aside>
         </div>
       </div>
-
-      <style>{`
-        .pulse-effect {
-          animation: pulse 1s infinite;
-        }
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.6; }
-          100% { opacity: 1; }
-        }
-        .spinner {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };
