@@ -7,7 +7,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Timer,
-  QrCode,
   Download,
   Trash2,
   Ticket,
@@ -670,21 +669,17 @@ const MyRegistrations = () => {
                       marginBottom: '24px',
                     }}
                   >
-                    <div
+                    <img
+                      src={`${api.defaults.baseURL}/registrations/${selectedReg.id}/qr-code`}
+                      alt={`QR code for ${selectedReg.workshopTitle}`}
                       style={{
                         width: '180px',
                         height: '180px',
                         margin: '0 auto 16px',
-                        background: 'var(--neutral-100)',
                         borderRadius: 'var(--radius-md)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: '1px solid var(--neutral-200)',
+                        display: 'block',
                       }}
-                    >
-                      <QrCode size={120} color="var(--text-heading)" />
-                    </div>
+                    />
                     <p style={{ fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>
                       Show this QR at check-in
                     </p>
@@ -692,21 +687,23 @@ const MyRegistrations = () => {
                       Present this code at the venue to check in
                     </p>
                     <button
-                      onClick={() => {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        if (ctx) {
-                          ctx.fillStyle = 'white';
-                          ctx.fillRect(0, 0, 200, 200);
-                          ctx.fillStyle = '#0F172A';
-                          ctx.font = '14px monospace';
-                          ctx.fillText(selectedReg.qrToken, 10, 20);
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(`${api.defaults.baseURL}/registrations/${selectedReg.id}/qr-code`, {
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                          });
+                          const blob = await response.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `qr-${selectedReg.workshopTitle.replace(/\s+/g, '-').toLowerCase()}.png`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        } catch (err) {
+                          console.error('Failed to download QR code:', err);
                         }
-                        const url = canvas.toDataURL('image/png');
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `qr-${selectedReg.workshopTitle.replace(/\s+/g, '-').toLowerCase()}.png`;
-                        a.click();
                       }}
                       className="btn"
                       style={{

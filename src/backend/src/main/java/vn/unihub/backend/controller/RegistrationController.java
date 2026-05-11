@@ -1,6 +1,8 @@
 package vn.unihub.backend.controller;
 
 import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -78,6 +80,22 @@ public class RegistrationController {
         return registrationService.cancelMyRegistration(user, registrationId);
     }
 
+    /**
+     * Get a QR code image for a registration.
+     * The QR code encodes the check-in URL path with the registration's qrToken.
+     *
+     * @param registrationId the registration ID
+     * @return PNG image of the QR code
+     */
+    @GetMapping("/registrations/{registrationId}/qr-code")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> getQrCodeImage(@PathVariable UUID registrationId) {
+        byte[] imageBytes = registrationService.getQrCodeImage(registrationId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .header("Cache-Control", "public, max-age=86400")
+                .body(imageBytes);
+    }
 
     private User currentUser(Authentication authentication) {
         return ((CustomUserDetails) authentication.getPrincipal()).getUser();

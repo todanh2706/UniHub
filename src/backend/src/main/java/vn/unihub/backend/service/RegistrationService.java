@@ -50,6 +50,7 @@ public class RegistrationService {
     private final PaymentService paymentService;
     private final IdempotencyService idempotencyService;
     private final NotificationService notificationService;
+    private final QrCodeCacheService qrCodeCacheService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RegistrationService(
@@ -59,7 +60,8 @@ public class RegistrationService {
             PaymentRepository paymentRepository,
             PaymentService paymentService,
             IdempotencyService idempotencyService,
-            NotificationService notificationService
+            NotificationService notificationService,
+            QrCodeCacheService qrCodeCacheService
     ) {
         this.workshopRepository = workshopRepository;
         this.registrationRepository = registrationRepository;
@@ -68,6 +70,7 @@ public class RegistrationService {
         this.paymentService = paymentService;
         this.idempotencyService = idempotencyService;
         this.notificationService = notificationService;
+        this.qrCodeCacheService = qrCodeCacheService;
     }
 
     @Transactional(readOnly = true)
@@ -229,6 +232,21 @@ public class RegistrationService {
         Registration registration = registrationRepository.findByIdAndStudentId(registrationId, student.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Registration not found"));
         return toRegistrationResponse(registration);
+    }
+
+    /**
+     * Get the QR code image bytes for a registration.
+     * The QR code encodes the check-in URL path.
+     *
+     * @param registrationId the registration ID
+     * @return PNG image bytes
+     */
+    @Transactional(readOnly = true)
+    public byte[] getQrCodeImage(UUID registrationId) {
+        Registration registration = registrationRepository.findById(registrationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Registration not found"));
+        String qrPayload = "/api/v1/checkins/qr/" + registration.getQrToken();
+        return qrCodeCacheService.getOrGenerateQrCode(registrationId, qrPayload);
     }
 
     @Transactional

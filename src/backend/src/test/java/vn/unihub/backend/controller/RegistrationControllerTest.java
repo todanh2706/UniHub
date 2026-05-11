@@ -31,6 +31,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -244,6 +245,31 @@ class RegistrationControllerTest {
                                 .with(httpBasic("organizer@unihub.local", "secret")))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.activeCount").value(1));
+        }
+
+        @Test
+        void getQrCodeImage_success() throws Exception {
+                byte[] imageBytes = mockMvc.perform(get("/api/v1/registrations/{registrationId}/qr-code",
+                                existingRegistration.getId())
+                                .with(httpBasic("student2@unihub.local", "secret")))
+                                .andExpect(status().isOk())
+                                .andExpect(content().contentType(MediaType.IMAGE_PNG))
+                                .andReturn().getResponse().getContentAsByteArray();
+
+                // Verify PNG header (magic bytes)
+                assert imageBytes.length >= 8 : "Response body is too short";
+                byte[] pngHeader = { (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+                for (int i = 0; i < 8; i++) {
+                        assert imageBytes[i] == pngHeader[i] : "Not a valid PNG file";
+                }
+        }
+
+        @Test
+        void getQrCodeImage_notFound_returns404() throws Exception {
+                mockMvc.perform(get("/api/v1/registrations/{registrationId}/qr-code",
+                                UUID.randomUUID())
+                                .with(httpBasic("student2@unihub.local", "secret")))
+                                .andExpect(status().isNotFound());
         }
 
         @Test
