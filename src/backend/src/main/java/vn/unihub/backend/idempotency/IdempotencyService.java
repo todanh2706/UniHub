@@ -55,8 +55,8 @@ public class IdempotencyService {
         if (existing.isPresent()) {
             IdempotencyKey existingKey = existing.get();
             if (existingKey.getRequestHash().equals(requestHash)) {
-                if ("COMPLETED".equals(existingKey.getResponseBody())) {
-                    // Will be replayed by filter
+                // If responseBody is not null, it's already completed
+                if (existingKey.getResponseBody() != null) {
                     return;
                 }
                 throw new IdempotencyConflictException(
@@ -77,7 +77,7 @@ public class IdempotencyService {
                 .user(user)
                 .endpoint(endpoint)
                 .requestHash(requestHash)
-                .responseBody("IN_PROGRESS")
+                .responseBody(null) // Use null for in-progress instead of invalid JSON string
                 .statusCode(202)
                 .expiresAt(Instant.now().plusSeconds(TTL_SECONDS))
                 .build();
@@ -122,7 +122,16 @@ public class IdempotencyService {
      * Get a previously completed response.
      */
     public String getCachedResponse(String key) {
-        return redisTemplate.opsForValue().get(REDIS_PREFIX + key);
+        // Try Redis first
+        String cached = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
+        if (cached != null) {
+            return cached;
+        }
+
+        // Fallback to PostgreSQL
+        return repository.findByKey(key)
+                .map(IdempotencyKey::getResponseBody)
+                .orElse(null);
     }
 
     /**
@@ -130,7 +139,14 @@ public class IdempotencyService {
      */
     public boolean isInProgress(String key) {
         String cached = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
-        return "IN_PROGRESS".equals(cached);
+        if ("IN_PROGRESS".equals(cached)) {
+            return true;
+        }
+        
+        // If not in Redis, check DB
+        return repository.findByKey(key)
+                .map(k -> k.getResponseBody() == null)
+                .orElse(false);
     }
 
     private void handleExistingKey(String key, String requestHash, String cachedResponse) {

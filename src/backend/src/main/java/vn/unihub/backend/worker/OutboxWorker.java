@@ -34,7 +34,11 @@ public class OutboxWorker {
     @Transactional
     public void processPendingEvents() {
         // Fetch up to 50 pending events to avoid memory issues and long transactions
-        List<OutboxEvent> pendingEvents = outboxEventRepository.findPendingEvents("PENDING", 50);
+        List<OutboxEvent> pendingEvents = outboxEventRepository.findPendingEvents(
+                "PENDING", 
+                Instant.now(), 
+                org.springframework.data.domain.PageRequest.of(0, 50)
+        );
         
         if (pendingEvents.isEmpty()) {
             return;

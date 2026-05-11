@@ -44,7 +44,6 @@ public class RegistrationController {
     }
 
     @GetMapping("/workshops/{workshopId}")
-    @PreAuthorize("isAuthenticated()")
     public WorkshopDetailResponse workshopDetail(@PathVariable UUID workshopId) {
         return registrationService.getWorkshopDetail(workshopId);
     }
@@ -81,8 +80,26 @@ public class RegistrationController {
     }
 
     /**
+     * Get a QR code image for a registration using its secret qrToken.
+     * This endpoint is public to allow <img> tags in the frontend to work
+     * without needing to send an Authorization header.
+     *
+     * @param qrToken the secret QR token
+     * @return PNG image of the QR code
+     */
+    @GetMapping("/public/registrations/qr/{qrToken}")
+    public ResponseEntity<byte[]> getQrCodeImageByToken(@PathVariable String qrToken) {
+        byte[] imageBytes = registrationService.getQrCodeImageByToken(qrToken);
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .header("Cache-Control", "public, max-age=86400")
+                .body(imageBytes);
+    }
+
+    /**
      * Get a QR code image for a registration.
-     * The QR code encodes the check-in URL path with the registration's qrToken.
+     * This method requires authentication and is kept for backward compatibility
+     * or for secure downloads.
      *
      * @param registrationId the registration ID
      * @return PNG image of the QR code

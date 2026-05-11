@@ -235,8 +235,21 @@ public class RegistrationService {
     }
 
     /**
+     * Get the QR code image bytes for a registration using its secret token.
+     *
+     * @param qrToken the secret QR token
+     * @return PNG image bytes
+     */
+    @Transactional(readOnly = true)
+    public byte[] getQrCodeImageByToken(String qrToken) {
+        Registration registration = registrationRepository.findByQrToken(qrToken)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Registration not found"));
+        String qrPayload = "/api/v1/checkins/qr/" + registration.getQrToken();
+        return qrCodeCacheService.getOrGenerateQrCode(registration.getId(), qrPayload);
+    }
+
+    /**
      * Get the QR code image bytes for a registration.
-     * The QR code encodes the check-in URL path.
      *
      * @param registrationId the registration ID
      * @return PNG image bytes

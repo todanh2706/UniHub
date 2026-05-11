@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.*;
 import vn.unihub.backend.dto.catalog.WorkshopResponse;
 import vn.unihub.backend.service.WorkshopService;
 
+import java.util.UUID;
+
+
 @RestController
 @RequestMapping("/api/v1/public/workshops")
 @RequiredArgsConstructor
@@ -21,5 +24,10 @@ public class StudentWorkshopController {
             @RequestParam(required = false) String status,
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(workshopService.getPublicWorkshops(keyword, status, pageable));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<WorkshopResponse> getWorkshopDetail(@PathVariable UUID id) {
+        return ResponseEntity.ok(workshopService.getWorkshopById(id));
     }
 }

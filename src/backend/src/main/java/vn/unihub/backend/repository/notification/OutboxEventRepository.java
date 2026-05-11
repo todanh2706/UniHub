@@ -11,6 +11,6 @@ import java.util.UUID;
 @Repository
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> {
     
-    @Query("SELECT e FROM OutboxEvent e WHERE e.status = :status AND e.availableAt <= CURRENT_TIMESTAMP ORDER BY e.availableAt ASC LIMIT :limit")
-    List<OutboxEvent> findPendingEvents(String status, int limit);
+    @Query("SELECT e FROM OutboxEvent e WHERE e.status = :status AND e.availableAt <= :now ORDER BY e.availableAt ASC")
+    List<OutboxEvent> findPendingEvents(String status, java.time.Instant now, org.springframework.data.domain.Pageable pageable);
 }
