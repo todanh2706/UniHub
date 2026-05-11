@@ -333,12 +333,18 @@ public class RegistrationService {
     }
 
     private Student resolveActiveStudent(User user) {
-        Student student = studentRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Student profile is required"));
-        if (!"ACTIVE".equals(student.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Student is not active");
-        }
-        return student;
+        return studentRepository.findByUserId(user.getId())
+                .orElseGet(() -> {
+                    log.info("Auto-creating student profile for user: {}", user.getEmail());
+                    Student newStudent = Student.builder()
+                            .user(user)
+                            .studentCode("GUEST_" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                            .fullName(user.getFullName())
+                            .email(user.getEmail())
+                            .status("ACTIVE")
+                            .build();
+                    return studentRepository.save(newStudent);
+                });
     }
 
     private WorkshopListItemResponse toWorkshopListItem(Workshop workshop, Instant now) {

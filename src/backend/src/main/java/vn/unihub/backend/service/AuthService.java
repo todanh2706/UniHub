@@ -19,6 +19,9 @@ import vn.unihub.backend.repository.auth.UserRoleRepository;
 import vn.unihub.backend.repository.auth.RefreshTokenRepository;
 import vn.unihub.backend.security.CustomUserDetails;
 import vn.unihub.backend.security.JwtService;
+import vn.unihub.backend.entity.student.Student;
+import vn.unihub.backend.repository.student.StudentRepository;
+
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final StudentRepository studentRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
@@ -56,6 +60,25 @@ public class AuthService {
                 .role(studentRole)
                 .build();
         userRoleRepository.save(userRole);
+
+        // Link or create Student profile
+        studentRepository.findByEmail(savedUser.getEmail())
+                .ifPresentOrElse(
+                        student -> {
+                            student.setUser(savedUser);
+                            studentRepository.save(student);
+                        },
+                        () -> {
+                            Student newStudent = Student.builder()
+                                    .user(savedUser)
+                                    .studentCode("GUEST_" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                                    .fullName(savedUser.getFullName())
+                                    .email(savedUser.getEmail())
+                                    .status("ACTIVE")
+                                    .build();
+                            studentRepository.save(newStudent);
+                        }
+                );
 
         var userDetails = new CustomUserDetails(savedUser);
         var jwtToken = jwtService.generateToken(userDetails);

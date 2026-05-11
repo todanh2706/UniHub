@@ -11,6 +11,7 @@ import vn.unihub.backend.dto.notification.RegistrationConfirmationPayload;
 import vn.unihub.backend.entity.notification.OutboxEvent;
 import vn.unihub.backend.repository.notification.OutboxEventRepository;
 import vn.unihub.backend.service.EmailService;
+import vn.unihub.backend.service.QrCodeCacheService;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -24,6 +25,7 @@ public class OutboxWorker {
 
     private final OutboxEventRepository outboxEventRepository;
     private final EmailService emailService;
+    private final QrCodeCacheService qrCodeCacheService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // A configurable base URL for frontend links in emails
@@ -83,11 +85,17 @@ public class OutboxWorker {
         variables.put("buildingName", payload.getBuildingName());
         variables.put("frontendUrl", frontendUrl);
 
+        String qrPayload = "/api/v1/checkins/qr/" + payload.getQrToken();
+        byte[] qrCodeImage = qrCodeCacheService.getOrGenerateQrCode(payload.getRegistrationId(), qrPayload);
+        Map<String, byte[]> inlineImages = new HashMap<>();
+        inlineImages.put("qrCode", qrCodeImage);
+
         emailService.sendHtmlEmail(
                 payload.getStudentEmail(),
                 "Workshop Registration Confirmed",
                 "email/registration-confirmation",
-                variables
+                variables,
+                inlineImages
         );
     }
 }

@@ -20,7 +20,10 @@ public class EmailService {
     private final JavaMailSender javaMailSender;
     private final TemplateEngine templateEngine;
 
-    public void sendHtmlEmail(String to, String subject, String templateName, Map<String, Object> variables) {
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.username:noreply@unihub.local}")
+    private String fromEmail;
+
+    public void sendHtmlEmail(String to, String subject, String templateName, Map<String, Object> variables, Map<String, byte[]> inlineImages) {
         try {
             Context context = new Context();
             context.setVariables(variables);
@@ -32,8 +35,13 @@ public class EmailService {
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlContent, true);
-            // Default from could be set in application.yaml: spring.mail.username, but let's assume it picks it up.
-            // Or explicitly: helper.setFrom("noreply@unihub.local");
+            helper.setFrom("UniHub <" + fromEmail + ">");
+
+            if (inlineImages != null) {
+                for (Map.Entry<String, byte[]> entry : inlineImages.entrySet()) {
+                    helper.addInline(entry.getKey(), new org.springframework.core.io.ByteArrayResource(entry.getValue()), "image/png");
+                }
+            }
 
             javaMailSender.send(message);
             log.info("Sent HTML email to: {} with subject: {}", to, subject);
@@ -41,5 +49,9 @@ public class EmailService {
             log.error("Failed to send HTML email to: {}", to, e);
             throw new RuntimeException("Failed to send email", e);
         }
+    }
+
+    public void sendHtmlEmail(String to, String subject, String templateName, Map<String, Object> variables) {
+        sendHtmlEmail(to, subject, templateName, variables, null);
     }
 }
