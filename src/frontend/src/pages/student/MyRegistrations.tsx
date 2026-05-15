@@ -13,6 +13,7 @@ import {
   ExternalLink,
   RefreshCw,
   ArrowLeft,
+  UserCheck
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -23,7 +24,7 @@ interface Registration {
   id: string;
   workshopId: string;
   workshopTitle: string;
-  status: 'CONFIRMED' | 'PENDING_PAYMENT' | 'CANCELLED';
+  status: 'CONFIRMED' | 'PENDING_PAYMENT' | 'CANCELLED' | 'CHECKED_IN';
   qrToken: string;
   qrPayload: string;
   createdAt: string;
@@ -52,6 +53,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
     bg: '#FEF2F2',
     icon: <AlertCircle size={14} />,
   },
+  CHECKED_IN: {
+    label: 'Checked In',
+    color: 'var(--primary-color)',
+    bg: 'rgba(79, 70, 229, 0.1)',
+    icon: <UserCheck size={14} />,
+  },
 };
 
 function formatDate(iso: string): string {
@@ -72,7 +79,7 @@ function formatTimeRange(start: string, end: string): string {
 }
 
 function isActive(status: string) {
-  return status === 'CONFIRMED' || status === 'PENDING_PAYMENT';
+  return status === 'CONFIRMED' || status === 'PENDING_PAYMENT' || status === 'CHECKED_IN';
 }
 
 const MyRegistrations = () => {

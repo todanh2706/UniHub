@@ -38,10 +38,11 @@ import java.util.UUID;
 @Service
 @Slf4j
 public class RegistrationService {
-    private static final String STATUS_CONFIRMED = "CONFIRMED";
-    private static final String STATUS_PENDING_PAYMENT = "PENDING_PAYMENT";
-    private static final String STATUS_CANCELLED = "CANCELLED";
-    private static final Set<String> ACTIVE_STATUSES = Set.of(STATUS_CONFIRMED, STATUS_PENDING_PAYMENT);
+    public static final String STATUS_CONFIRMED = "CONFIRMED";
+    public static final String STATUS_PENDING_PAYMENT = "PENDING_PAYMENT";
+    public static final String STATUS_CANCELLED = "CANCELLED";
+    public static final String STATUS_CHECKED_IN = "CHECKED_IN";
+    private static final Set<String> ACTIVE_STATUSES = Set.of(STATUS_CONFIRMED, STATUS_PENDING_PAYMENT, STATUS_CHECKED_IN);
 
     private final WorkshopRepository workshopRepository;
     private final RegistrationRepository registrationRepository;

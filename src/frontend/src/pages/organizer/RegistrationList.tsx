@@ -80,6 +80,7 @@ const RegistrationList: React.FC = () => {
     let color = 'var(--text-body)';
     
     if (s === 'CONFIRMED') { bg = `${getStatusColor('PUBLISHED')}15`; color = getStatusColor('PUBLISHED'); }
+    else if (s === 'CHECKED_IN') { bg = 'rgba(79, 70, 229, 0.1)'; color = 'var(--primary-color)'; }
     else if (s === 'PENDING_PAYMENT') { bg = `${getStatusColor('DRAFT')}15`; color = getStatusColor('DRAFT'); }
     else if (s === 'CANCELLED') { bg = `${getStatusColor('CANCELLED')}15`; color = getStatusColor('CANCELLED'); }
 

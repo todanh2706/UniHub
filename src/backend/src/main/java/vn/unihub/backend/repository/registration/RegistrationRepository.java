@@ -20,6 +20,7 @@ public interface RegistrationRepository extends JpaRepository<Registration, UUID
             where r.workshop.id = :workshopId
               and (
                 r.status = 'CONFIRMED'
+                or r.status = 'CHECKED_IN'
                 or (r.status = 'PENDING_PAYMENT' and r.expiresAt is not null and r.expiresAt > :now)
               )
             """)

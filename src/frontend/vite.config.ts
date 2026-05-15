@@ -46,5 +46,18 @@ export default defineConfig({
     hmr: {
       clientPort: 3000, // Matching the mapped port in docker-compose
     },
+    proxy: {
+      // Forward all API and public calls to the backend container.
+      // This allows mobile devices on LAN (192.168.x.x:3000) to reach
+      // the backend without needing to know the backend's hostname/port.
+      '/api': {
+        target: 'http://backend:8080',
+        changeOrigin: true,
+      },
+      '/public': {
+        target: 'http://backend:8080',
+        changeOrigin: true,
+      },
+    },
   },
 })

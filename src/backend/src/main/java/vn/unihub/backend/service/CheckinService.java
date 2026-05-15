@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -28,11 +29,12 @@ public class CheckinService {
     private final RegistrationRepository registrationRepository;
 
     /** Registration statuses that are NOT eligible for check-in */
-    private static final Set<String> INVALID_STATUSES = Set.of("CANCELLED", "EXPIRED");
+    private static final Set<String> INVALID_STATUSES = Set.of("CANCELLED", "EXPIRED", "CHECKED_IN", "PENDING_PAYMENT");
 
     /**
      * Process a batch of offline check-in records.
-     * Each item is processed independently - if one fails, others still succeed (fault tolerance).
+     * Each item is processed independently - if one fails, others still succeed
+     * (fault tolerance).
      *
      * Guarantees:
      * - Idempotency via unique client_event_id: duplicate syncs are safely ignored.
@@ -52,13 +54,12 @@ public class CheckinService {
             try {
                 processItem(item, operator, synced, errors);
             } catch (Exception e) {
-                log.error("[CheckinService] Unexpected error processing clientEventId={}: {}",
-                        item.clientEventId(), e.getMessage(), e);
+                log.error("[CheckinService] CRITICAL ERROR processing check-in for qrToken={}: {}",
+                        item.qrToken(), e.getMessage(), e);
                 errors.add(new ErrorItem(
                         item.clientEventId(),
                         "INTERNAL_ERROR",
-                        "An unexpected error occurred while processing this check-in"
-                ));
+                        "An unexpected error occurred while processing this check-in"));
             }
         }
 
@@ -73,8 +74,7 @@ public class CheckinService {
             SyncCheckinRequest.Item item,
             User operator,
             List<SyncedItem> synced,
-            List<ErrorItem> errors
-    ) {
+            List<ErrorItem> errors) {
         // 1. Idempotency check: skip if client_event_id already exists in DB
         Optional<Checkin> existingByClientEvent = checkinRepository.findByClientEventId(item.clientEventId());
         if (existingByClientEvent.isPresent()) {
@@ -83,24 +83,36 @@ public class CheckinService {
             synced.add(new SyncedItem(
                     item.clientEventId(),
                     existingByClientEvent.get().getId(),
-                    "ALREADY_SYNCED"
-            ));
+                    "ALREADY_SYNCED"));
             return;
         }
 
-        // 2. Resolve registration from QR token
-        Optional<Registration> registrationOpt = registrationRepository.findByQrToken(item.qrToken());
-        if (registrationOpt.isEmpty()) {
-            log.warn("[CheckinService] Invalid QR token for clientEventId={}", item.clientEventId());
+        // 2. Resolve registration from QR token or ID
+        String rawToken = item.qrToken();
+        String processedToken = rawToken;
+        if (rawToken != null && rawToken.contains("/api/v1/checkins/qr/")) {
+            processedToken = rawToken.substring(rawToken.lastIndexOf("/") + 1);
+        }
+
+        final String finalToken = processedToken;
+        Registration registration = registrationRepository.findByQrToken(finalToken)
+                .or(() -> {
+                    try {
+                        return registrationRepository.findById(UUID.fromString(rawToken));
+                    } catch (Exception e) {
+                        return Optional.empty();
+                    }
+                })
+                .orElse(null);
+
+        if (registration == null) {
+            log.warn("[CheckinService] Invalid QR token/ID '{}' for clientEventId={}", rawToken, item.clientEventId());
             errors.add(new ErrorItem(
                     item.clientEventId(),
                     "INVALID_QR",
-                    "QR code is invalid or does not match any registration"
-            ));
+                    "QR code is invalid or does not match any registration"));
             return;
         }
-
-        Registration registration = registrationOpt.get();
 
         // 3. Validate registration status (must not be cancelled or expired)
         if (INVALID_STATUSES.contains(registration.getStatus())) {
@@ -109,20 +121,19 @@ public class CheckinService {
             errors.add(new ErrorItem(
                     item.clientEventId(),
                     "REGISTRATION_" + registration.getStatus(),
-                    "Registration is " + registration.getStatus().toLowerCase() + " and cannot be checked in"
-            ));
+                    "Registration is " + registration.getStatus().toLowerCase() + " and cannot be checked in"));
             return;
         }
 
-        // 4. Check if this registration has already been checked in (by another device/event)
+        // 4. Check if this registration has already been checked in (by another
+        // device/event)
         if (checkinRepository.existsByRegistrationId(registration.getId())) {
             log.debug("[CheckinService] Registration {} already checked in, skipping clientEventId={}",
                     registration.getId(), item.clientEventId());
             errors.add(new ErrorItem(
                     item.clientEventId(),
                     "ALREADY_CHECKED_IN",
-                    "This registration has already been checked in"
-            ));
+                    "This registration has already been checked in"));
             return;
         }
 
@@ -138,13 +149,17 @@ public class CheckinService {
 
         Checkin saved = checkinRepository.save(checkin);
 
-        log.info("[CheckinService] Successfully checked in registration={} with clientEventId={}",
-                registration.getId(), item.clientEventId());
+        // 6. Update registration status to CHECKED_IN
+        String oldStatus = registration.getStatus();
+        registration.setStatus(RegistrationService.STATUS_CHECKED_IN);
+        registrationRepository.saveAndFlush(registration);
+
+        log.info("[CheckinService] Status updated for registration={}: {} -> {} (clientEventId={})",
+                registration.getId(), oldStatus, registration.getStatus(), item.clientEventId());
 
         synced.add(new SyncedItem(
                 item.clientEventId(),
                 saved.getId(),
-                "CREATED"
-        ));
+                "CREATED"));
     }
 }
