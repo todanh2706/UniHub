@@ -7,7 +7,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import vn.unihub.backend.dto.notification.NotificationResponse;
-import vn.unihub.backend.entity.auth.User;
+import vn.unihub.backend.security.CustomUserDetails;
 import vn.unihub.backend.service.NotificationService;
 
 import java.util.Map;
@@ -23,26 +23,26 @@ public class NotificationController {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<NotificationResponse>> getMyNotifications(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ResponseEntity.ok(notificationService.getMyNotifications(user, page, size));
+        return ResponseEntity.ok(notificationService.getMyNotifications(userDetails.getUser(), page, size));
     }
 
     @GetMapping("/unread-count")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Map<String, Long>> getUnreadCount(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(Map.of("count", notificationService.getUnreadCount(user)));
+    public ResponseEntity<Map<String, Long>> getUnreadCount(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(Map.of("count", notificationService.getUnreadCount(userDetails.getUser())));
     }
 
     @PatchMapping("/{id}/read")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> markAsRead(
             @PathVariable UUID id,
-            @AuthenticationPrincipal User user
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        notificationService.markAsRead(id, user);
+        notificationService.markAsRead(id, userDetails.getUser());
         return ResponseEntity.ok().build();
     }
 }

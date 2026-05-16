@@ -1,22 +1,16 @@
 package vn.unihub.backend.worker;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import vn.unihub.backend.dto.notification.RegistrationConfirmationPayload;
 import vn.unihub.backend.entity.notification.OutboxEvent;
 import vn.unihub.backend.repository.notification.OutboxEventRepository;
-import vn.unihub.backend.service.EmailService;
-import vn.unihub.backend.service.QrCodeCacheService;
+import vn.unihub.backend.worker.handler.OutboxEventHandler;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -24,13 +18,7 @@ import java.util.Map;
 public class OutboxWorker {
 
     private final OutboxEventRepository outboxEventRepository;
-    private final EmailService emailService;
-    private final QrCodeCacheService qrCodeCacheService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    // A configurable base URL for frontend links in emails
-    @Value("${app.frontend.url:http://localhost:3000}")
-    private String frontendUrl;
+    private final List<OutboxEventHandler> handlers;
 
     @Scheduled(fixedDelayString = "${application.outbox.fixed-delay-ms:5000}")
     @Transactional
@@ -54,10 +42,16 @@ public class OutboxWorker {
                 event.setStatus("PROCESSING");
                 outboxEventRepository.saveAndFlush(event);
 
-                if ("REGISTRATION_CONFIRMED".equals(event.getEventType())) {
-                    processRegistrationConfirmation(event);
-                } else {
-                    log.warn("Unknown event type: {}", event.getEventType());
+                boolean handled = false;
+                for (OutboxEventHandler handler : handlers) {
+                    if (handler.supports(event.getEventType())) {
+                        handler.handle(event);
+                        handled = true;
+                    }
+                }
+
+                if (!handled) {
+                    log.warn("No handler found for event type: {}", event.getEventType());
                 }
 
                 event.setStatus("PROCESSED");
@@ -72,30 +66,5 @@ public class OutboxWorker {
                 outboxEventRepository.save(event);
             }
         }
-    }
-
-    private void processRegistrationConfirmation(OutboxEvent event) throws Exception {
-        RegistrationConfirmationPayload payload = objectMapper.readValue(event.getPayload(), RegistrationConfirmationPayload.class);
-
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("studentName", payload.getStudentName());
-        variables.put("workshopTitle", payload.getWorkshopTitle());
-        variables.put("startTime", payload.getStartTime());
-        variables.put("roomName", payload.getRoomName());
-        variables.put("buildingName", payload.getBuildingName());
-        variables.put("frontendUrl", frontendUrl);
-
-        String qrPayload = "/api/v1/checkins/qr/" + payload.getQrToken();
-        byte[] qrCodeImage = qrCodeCacheService.getOrGenerateQrCode(payload.getRegistrationId(), qrPayload);
-        Map<String, byte[]> inlineImages = new HashMap<>();
-        inlineImages.put("qrCode", qrCodeImage);
-
-        emailService.sendHtmlEmail(
-                payload.getStudentEmail(),
-                "Workshop Registration Confirmed",
-                "email/registration-confirmation",
-                variables,
-                inlineImages
-        );
     }
 }

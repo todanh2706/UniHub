@@ -1,21 +1,16 @@
 package vn.unihub.backend.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import vn.unihub.backend.dto.notification.RegistrationConfirmationPayload;
 import vn.unihub.backend.entity.notification.Notification;
-import vn.unihub.backend.entity.notification.OutboxEvent;
 import vn.unihub.backend.entity.registration.Registration;
 import vn.unihub.backend.repository.notification.NotificationRepository;
-import vn.unihub.backend.repository.notification.OutboxEventRepository;
+import vn.unihub.backend.service.notification.NotificationChannel;
 
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,11 +18,7 @@ import java.time.format.DateTimeFormatter;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
-    private final OutboxEventRepository outboxEventRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm - dd/MM/yyyy")
-            .withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
+    private final List<NotificationChannel> notificationChannels;
 
     @Transactional
     public void sendRegistrationConfirmation(Registration registration) {
@@ -36,45 +27,13 @@ public class NotificationService {
             return;
         }
 
-        // 1. Create In-App Notification
-        String title = "Registration Confirmed: " + registration.getWorkshop().getTitle();
-        String body = "Your registration for the workshop has been confirmed. You can view your QR code in your profile.";
-        
-        Notification notification = Notification.builder()
-                .user(registration.getStudent().getUser())
-                .type("WORKSHOP_CONFIRMED")
-                .title(title)
-                .body(body)
-                .build();
-        notificationRepository.save(notification);
-
-        // 2. Create Outbox Event for Email Delivery
-        try {
-            RegistrationConfirmationPayload payload = RegistrationConfirmationPayload.builder()
-                    .registrationId(registration.getId())
-                    .studentId(registration.getStudent().getId())
-                    .studentEmail(registration.getStudent().getEmail())
-                    .studentName(registration.getStudent().getFullName())
-                    .workshopTitle(registration.getWorkshop().getTitle())
-                    .qrToken(registration.getQrToken())
-                    .startTime(formatter.format(registration.getWorkshop().getStartTime()))
-                    .roomName(registration.getWorkshop().getRoom().getName())
-                    .buildingName(registration.getWorkshop().getRoom().getBuilding())
-                    .build();
-
-            OutboxEvent outboxEvent = OutboxEvent.builder()
-                    .eventType("REGISTRATION_CONFIRMED")
-                    .aggregateType("Registration")
-                    .aggregateId(registration.getId().toString())
-                    .payload(objectMapper.writeValueAsString(payload))
-                    .status("PENDING")
-                    .availableAt(Instant.now())
-                    .build();
-            outboxEventRepository.save(outboxEvent);
-
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize outbox event payload for registration {}", registration.getId(), e);
-            throw new RuntimeException("Failed to serialize outbox event payload", e);
+        // Delegate to all configured notification channels (In-App, Email, etc.)
+        for (NotificationChannel channel : notificationChannels) {
+            try {
+                channel.sendRegistrationConfirmation(registration);
+            } catch (Exception e) {
+                log.error("Error sending registration confirmation through channel {}: {}", channel.getClass().getSimpleName(), e.getMessage(), e);
+            }
         }
     }
 
