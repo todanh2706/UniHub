@@ -143,10 +143,10 @@ public class RegistrationService {
         if (now.isBefore(workshop.getRegistrationOpensAt()) || now.isAfter(workshop.getRegistrationClosesAt())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Registration window is closed");
         }
-        if (registrationRepository.existsByStudentAndWorkshopAndStatuses(student.getId(), workshopId, ACTIVE_STATUSES)) {
+        if (registrationRepository.existsActiveRegistration(student.getId(), workshopId, now)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Student already has an active registration");
         }
-        if (registrationRepository.hasTimeOverlap(student.getId(), workshop.getStartTime(), workshop.getEndTime(), ACTIVE_STATUSES)) {
+        if (registrationRepository.hasTimeOverlap(student.getId(), workshop.getStartTime(), workshop.getEndTime(), now)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Student already has an overlapping workshop registration");
         }
 

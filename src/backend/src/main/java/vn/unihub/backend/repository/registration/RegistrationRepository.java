@@ -31,12 +31,16 @@ public interface RegistrationRepository extends JpaRepository<Registration, UUID
             from Registration r
             where r.student.id = :studentId
               and r.workshop.id = :workshopId
-              and r.status in :statuses
+              and (
+                r.status = 'CONFIRMED'
+                or r.status = 'CHECKED_IN'
+                or (r.status = 'PENDING_PAYMENT' and (r.expiresAt is null or r.expiresAt > :now))
+              )
             """)
-    boolean existsByStudentAndWorkshopAndStatuses(
+    boolean existsActiveRegistration(
             @Param("studentId") UUID studentId,
             @Param("workshopId") UUID workshopId,
-            @Param("statuses") Collection<String> statuses
+            @Param("now") Instant now
     );
 
     @Query("""
@@ -44,7 +48,11 @@ public interface RegistrationRepository extends JpaRepository<Registration, UUID
             from Registration r
             join r.workshop existingW
             where r.student.id = :studentId
-              and r.status in :statuses
+              and (
+                r.status = 'CONFIRMED'
+                or r.status = 'CHECKED_IN'
+                or (r.status = 'PENDING_PAYMENT' and (r.expiresAt is null or r.expiresAt > :now))
+              )
               and existingW.startTime < :newEnd
               and existingW.endTime > :newStart
             """)
@@ -52,7 +60,7 @@ public interface RegistrationRepository extends JpaRepository<Registration, UUID
             @Param("studentId") UUID studentId,
             @Param("newStart") Instant newStart,
             @Param("newEnd") Instant newEnd,
-            @Param("statuses") Collection<String> statuses
+            @Param("now") Instant now
     );
 
     List<Registration> findByStudentIdOrderByCreatedAtDesc(UUID studentId);

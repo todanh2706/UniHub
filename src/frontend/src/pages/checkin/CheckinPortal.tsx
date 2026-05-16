@@ -83,25 +83,46 @@ const CheckinPortal: React.FC = () => {
       if (pending.length === 0) return 0;
 
       const items = pending.map(p => ({
-        qrToken: p.qr_token,
-        clientEventId: p.client_event_id,
-        checkedInAt: p.checked_in_at
+        qrToken: p.qr_token || '',
+        clientEventId: p.client_event_id || '',
+        checkedInAt: p.checked_in_at // SQLite stores this as ISO string, which matches Instant
       }));
+
+      console.log('Syncing items:', items);
 
       const response = await api.post('/checkins/sync', { items });
       const { synced, errors } = response.data;
 
-      let successCount = 0;
-      if (synced && synced.length > 0) {
-        successCount = synced.length;
-        const syncedEventIds = synced.map((s: any) => s.clientEventId);
-        await markAsSynced(syncedEventIds);
+      // 1. Collect IDs that are considered "done" (either success or permanent errors)
+      const successIds = (synced || []).map((s: any) => s.clientEventId);
+      
+      // Permanent errors are ones that won't succeed even if we retry
+      const permanentErrorIds = (errors || [])
+        .filter((e: any) => [
+          'ALREADY_CHECKED_IN', 
+          'REGISTRATION_CHECKED_IN',
+          'INVALID_QR', 
+          'REGISTRATION_CANCELLED', 
+          'REGISTRATION_EXPIRED'
+        ].includes(e.code))
+        .map((e: any) => e.clientEventId);
+
+      const allProcessedIds = [...successIds, ...permanentErrorIds];
+      
+      if (allProcessedIds.length > 0) {
+        await markAsSynced(allProcessedIds);
       }
 
-      if (errors && errors.length > 0) {
-        const firstError = errors[0];
-        console.error('Sync partial failure:', errors);
-        showToast(`Lỗi đồng bộ: ${firstError.message}`, 'error');
+      let successCount = successIds.length;
+
+      // 2. Report actual errors to user (excluding benign ones)
+      const benignErrorCodes = ['ALREADY_CHECKED_IN', 'REGISTRATION_CHECKED_IN'];
+      const realErrors = (errors || []).filter((e: any) => !benignErrorCodes.includes(e.code));
+      if (realErrors.length > 0) {
+        console.error('Sync partial failures:', realErrors);
+        showToast(`Đồng bộ lỗi ${realErrors.length} bản ghi`, 'error');
+      } else if (allProcessedIds.length > 0) {
+        showToast(`✅ Đồng bộ hoàn tất!`, 'success');
       }
 
       await refreshPendingCount();
@@ -110,9 +131,28 @@ const CheckinPortal: React.FC = () => {
         fetchAttendees(selectedWorkshop.id);
       }
       return successCount;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to sync pending checkins:', err);
-      showToast('Lỗi kết nối server khi đồng bộ.', 'error');
+      
+      let errorMsg = 'Lỗi kết nối server khi đồng bộ.';
+      
+      if (err.response?.status === 400 && err.response.data) {
+        // If it's a validation error map from GlobalExceptionHandler
+        const errorData = err.response.data;
+        if (errorData.message) {
+          errorMsg = `Lỗi: ${errorData.message}`;
+        } else {
+          // It's likely a field-level validation error map
+          const firstField = Object.keys(errorData)[0];
+          const firstMessage = errorData[firstField];
+          errorMsg = `Dữ liệu lỗi (${firstField}): ${firstMessage}`;
+          console.error('Validation errors:', errorData);
+        }
+      } else if (err.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      }
+      
+      showToast(errorMsg, 'error');
       return 0;
     }
   }, [isOnline, refreshPendingCount, selectedWorkshop, showToast, fetchAttendees]);
@@ -137,11 +177,17 @@ const CheckinPortal: React.FC = () => {
 
 
   const handleQrScanned = useCallback(async (qrToken: string) => {
+    const trimmedToken = qrToken?.trim();
+    if (!trimmedToken) {
+      showToast('Mã QR không hợp lệ (rỗng).', 'error');
+      return;
+    }
+
     const clientEventId = generateUUID();
     const checkedInAt = new Date().toISOString();
 
     try {
-      await saveCheckin(qrToken, clientEventId, checkedInAt);
+      await saveCheckin(trimmedToken, clientEventId, checkedInAt);
       await refreshPendingCount();
 
       let syncedSuccessfully = false;
@@ -154,9 +200,6 @@ const CheckinPortal: React.FC = () => {
         showToast('✅ Check-in thành công!', 'success');
       } else if (!isOnline) {
         showToast('📱 Đã lưu offline! Sẽ đồng bộ khi có mạng.', 'info');
-      } else {
-        // Online but sync count was 0 (meaning error or already synced)
-        // syncPendingCheckins already shows specific error toast
       }
     } catch (err) {
       console.error('QR handle error:', err);
@@ -165,43 +208,78 @@ const CheckinPortal: React.FC = () => {
   }, [isOnline, refreshPendingCount, syncPendingCheckins, showToast]);
 
   const startScanner = useCallback(async () => {
+    // Clean up any existing scanner instance before starting
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.getState() > 1) {
+          await scannerRef.current.stop();
+        }
+      } catch (e) {
+        console.warn('Cleanup error:', e);
+      }
+      scannerRef.current = null;
+    }
+
     setShowScanner(true);
     setScannerReady(false);
 
-    // Wait for DOM to render the container
-    await new Promise(r => setTimeout(r, 300));
+    // Give the DOM enough time to render the scanner container
+    await new Promise(r => setTimeout(r, 450));
 
     try {
       const scanner = new Html5Qrcode(scannerContainerId);
       scannerRef.current = scanner;
 
-      // Try to get available cameras (fixes issues on Macbooks/Laptops without back camera)
-      const devices = await Html5Qrcode.getCameras();
-      let cameraConfig: any = { facingMode: 'environment' };
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+      };
 
-      if (devices && devices.length > 0) {
-        const backCamera = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
-        cameraConfig = backCamera ? backCamera.id : devices[0].id;
+      const onScanSuccess = async (decodedText: string) => {
+        try { await scanner.pause(true); } catch { /* ignore */ }
+        await handleQrScanned(decodedText);
+        setTimeout(() => {
+          try { scanner.resume(); } catch { /* ignore */ }
+        }, 2000);
+      };
+
+      // Try environment facing mode first (standard for mobile back camera)
+      try {
+        await scanner.start({ facingMode: 'environment' }, config, onScanSuccess, () => {});
+      } catch (envErr) {
+        console.warn('FacingMode environment failed, trying enumeration...', envErr);
+        
+        // Fallback to enumeration
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length > 0) {
+          // Look for back camera in labels
+          const backCamera = devices.find(d => 
+            /back|rear|environment|mặt sau|sau/i.test(d.label)
+          );
+          const cameraId = backCamera ? backCamera.id : devices[0].id;
+          await scanner.start(cameraId, config, onScanSuccess, () => {});
+        } else {
+          throw envErr; // Re-throw the original error if no cameras found
+        }
       }
-
-      await scanner.start(
-        cameraConfig,
-        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-        async (decodedText) => {
-          // Pause scanning briefly to avoid duplicate scans
-          try { await scanner.pause(true); } catch { /* ignore */ }
-          await handleQrScanned(decodedText);
-          // Resume scanning after a short delay
-          setTimeout(() => {
-            try { scanner.resume(); } catch { /* scanner may have been stopped */ }
-          }, 2000);
-        },
-        () => { /* QR scan error - ignore, scanner keeps trying */ }
-      );
+      
       setScannerReady(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to start QR scanner:', err);
-      showToast('Không thể mở camera. Kiểm tra quyền truy cập.', 'error');
+      
+      let errorMsg = 'Không thể mở camera. Kiểm tra quyền truy cập.';
+      
+      // Specific diagnosis for common mobile issues
+      if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+        errorMsg = 'Camera yêu cầu HTTPS để hoạt động trên điện thoại. Hãy dùng ngrok hoặc cấu hình HTTPS.';
+      } else if (err?.name === 'NotAllowedError' || err?.toString().includes('Permission')) {
+        errorMsg = 'Quyền truy cập camera bị từ chối. Hãy kiểm tra cài đặt trang web.';
+      } else if (err?.name === 'NotReadableError') {
+        errorMsg = 'Camera đang bị ứng dụng khác chiếm dụng.';
+      }
+      
+      showToast(errorMsg, 'error');
       setShowScanner(false);
     }
   }, [handleQrScanned, showToast]);
@@ -210,10 +288,17 @@ const CheckinPortal: React.FC = () => {
     if (scannerRef.current) {
       try {
         const state = scannerRef.current.getState();
-        if (state === 2 || state === 3) { // SCANNING or PAUSED
+        if (state > 1) { // 2 = SCANNING, 3 = PAUSED
           await scannerRef.current.stop();
         }
-      } catch { /* ignore */ }
+      } catch (e) {
+        console.warn('Stop scanner error:', e);
+      }
+      
+      // Force clear the container to be safe
+      const container = document.getElementById(scannerContainerId);
+      if (container) container.innerHTML = '';
+      
       scannerRef.current = null;
     }
     setShowScanner(false);

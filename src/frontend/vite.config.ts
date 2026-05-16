@@ -40,11 +40,12 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    allowedHosts: true, // Disable host check for easy development with tunnels
     watch: {
       usePolling: true,
     },
     hmr: {
-      clientPort: 3000, // Matching the mapped port in docker-compose
+      // Remove clientPort so it uses the same port as the page (HTTPS 443)
     },
     proxy: {
       // Forward all API and public calls to the backend container.

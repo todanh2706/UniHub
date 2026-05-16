@@ -82,7 +82,8 @@ public class SecurityConfig {
                 "http://192.168.*:*",
                 "http://172.*:*",
                 "http://10.*:*",
-                "http://*.ngrok-free.app"
+                "https://*.ngrok-free.app",
+                "https://*.ngrok-free.dev"
         ));
         configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(java.util.List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "Idempotency-Key"));

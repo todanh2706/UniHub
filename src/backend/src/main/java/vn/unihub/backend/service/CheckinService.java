@@ -27,32 +27,24 @@ import java.util.UUID;
 public class CheckinService {
     private final CheckinRepository checkinRepository;
     private final RegistrationRepository registrationRepository;
+    private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     /** Registration statuses that are NOT eligible for check-in */
     private static final Set<String> INVALID_STATUSES = Set.of("CANCELLED", "EXPIRED", "CHECKED_IN", "PENDING_PAYMENT");
 
     /**
      * Process a batch of offline check-in records.
-     * Each item is processed independently - if one fails, others still succeed
-     * (fault tolerance).
-     *
-     * Guarantees:
-     * - Idempotency via unique client_event_id: duplicate syncs are safely ignored.
-     * - Unique registration_id: a registration can only be checked in once.
-     * - QR token resolution: finds registration by qr_token scanned from QR code.
-     *
-     * @param items    list of offline check-in items from the client
-     * @param operator the authenticated check-in staff member
-     * @return response with lists of successfully synced items and errors
      */
-    @Transactional
     public CheckinSyncResponse syncOfflineCheckins(List<SyncCheckinRequest.Item> items, User operator) {
         List<SyncedItem> synced = new ArrayList<>();
         List<ErrorItem> errors = new ArrayList<>();
 
         for (SyncCheckinRequest.Item item : items) {
             try {
-                processItem(item, operator, synced, errors);
+                transactionTemplate.execute(status -> {
+                    processItem(item, operator, synced, errors);
+                    return null;
+                });
             } catch (Exception e) {
                 log.error("[CheckinService] CRITICAL ERROR processing check-in for qrToken={}: {}",
                         item.qrToken(), e.getMessage(), e);
