@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "UniHub Checkin",
+    "slug": "unihub-checkin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#F8FAFC"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.unihub.checkin"
+    },
+    "android": {
+      "package": "com.unihub.checkin",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow UniHub Checkin to access your camera to scan QR codes."
+        }
+      ],
+      "./withCameraMaven.js"
+    ]
+  }
+}
