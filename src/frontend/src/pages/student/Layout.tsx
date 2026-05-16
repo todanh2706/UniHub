@@ -1,8 +1,20 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
+import { useAuthStore } from '../../store/authStore';
 
 const StudentLayout = () => {
+  const { isAuthenticated, user } = useAuthStore();
+
+  if (isAuthenticated && user?.roles) {
+    const hasStudentRole = user.roles.includes('STUDENT');
+    if (!hasStudentRole) {
+      if (user.roles.includes('ORGANIZER')) return <Navigate to="/organizer" replace />;
+      if (user.roles.includes('CHECKIN_STAFF')) return <Navigate to="/checkin" replace />;
+      if (user.roles.includes('ADMIN')) return <Navigate to="/admin" replace />;
+    }
+  }
+
   return (
     <div className="app-layout" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />

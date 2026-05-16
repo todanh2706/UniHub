@@ -27,7 +27,16 @@ const LoginPage: React.FC = () => {
       const { token, refreshToken, email, firstName, lastName, roles } = response.data;
 
       setAuth({ email, firstName, lastName, roles }, token, refreshToken);
-      navigate('/');
+      
+      if (roles?.includes('ORGANIZER')) {
+        navigate('/organizer');
+      } else if (roles?.includes('CHECKIN_STAFF')) {
+        navigate('/checkin');
+      } else if (roles?.includes('ADMIN')) {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid email or password');
     } finally {

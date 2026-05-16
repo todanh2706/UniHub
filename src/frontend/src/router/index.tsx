@@ -63,7 +63,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/admin',
-    element: <ProtectedRoute />,
+    element: <ProtectedRoute allowedRoles={['ADMIN']} />,
     children: [
       {
         element: <AdminLayout />,
@@ -78,7 +78,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/checkin',
-    element: <ProtectedRoute />,
+    element: <ProtectedRoute allowedRoles={['CHECKIN_STAFF']} />,
     children: [
       {
         element: <CheckinLayout />,
@@ -93,7 +93,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/organizer',
-    element: <ProtectedRoute />,
+    element: <ProtectedRoute allowedRoles={['ORGANIZER']} />,
     children: [
       {
         element: <OrganizerLayout />,

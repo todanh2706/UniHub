@@ -27,25 +27,25 @@ public class OrganizerWorkshopController {
     private final RegistrationService registrationService;
 
     @GetMapping("/events")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER', 'CHECKIN_STAFF')")
     public ResponseEntity<List<vn.unihub.backend.entity.catalog.Event>> getEvents() {
         return ResponseEntity.ok(workshopService.getAllEvents());
     }
 
     @GetMapping("/rooms")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER', 'CHECKIN_STAFF')")
     public ResponseEntity<List<vn.unihub.backend.entity.catalog.Room>> getRooms() {
         return ResponseEntity.ok(workshopService.getAllRooms());
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER', 'CHECKIN_STAFF')")
     public ResponseEntity<List<WorkshopResponse>> getAllWorkshops() {
         return ResponseEntity.ok(workshopService.getAllWorkshops());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER', 'CHECKIN_STAFF')")
     public ResponseEntity<WorkshopResponse> getWorkshopById(@PathVariable UUID id) {
         return ResponseEntity.ok(workshopService.getWorkshopById(id));
     }
@@ -76,7 +76,7 @@ public class OrganizerWorkshopController {
 
     // Quản lý danh sách đăng ký
     @GetMapping("/{id}/registrations")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER') or hasAuthority('WORKSHOP_MANAGE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER', 'CHECKIN_STAFF') or hasAuthority('WORKSHOP_MANAGE')")
     public ResponseEntity<Page<vn.unihub.backend.dto.registration.OrganizerAttendeeResponse>> getWorkshopRegistrations(
             @PathVariable UUID id,
             @RequestParam(required = false) String status,
@@ -86,13 +86,13 @@ public class OrganizerWorkshopController {
     }
 
     @GetMapping("/{id}/registration-summary")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER') or hasAuthority('WORKSHOP_MANAGE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER', 'CHECKIN_STAFF') or hasAuthority('WORKSHOP_MANAGE')")
     public ResponseEntity<OrganizerRegistrationSummaryResponse> getWorkshopRegistrationSummary(@PathVariable UUID id) {
         return ResponseEntity.ok(registrationService.getWorkshopRegistrationSummary(id));
     }
 
     @PatchMapping("/registrations/{registrationId}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER') or hasAuthority('WORKSHOP_MANAGE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER', 'CHECKIN_STAFF') or hasAuthority('WORKSHOP_MANAGE')")
     public ResponseEntity<RegistrationResponse> updateRegistrationStatus(
             @PathVariable UUID registrationId,
             @RequestParam String status,
