@@ -30,12 +30,10 @@ public class CsvSyncController {
 
     @PostMapping("/trigger")
     public ResponseEntity<Map<String, Object>> triggerSync() {
-        CompletableFuture<UUID> future = csvSyncService.triggerSync();
-        UUID jobId = future.join();
+        UUID jobId = csvSyncService.triggerSync();
         if (jobId == null) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "SYNC_IN_PROGRESS",
-                            "message", "A CSV sync is already in progress"));
+            return ResponseEntity.ok()
+                    .body(Map.of("message", "No new files to sync or all files already imported."));
         }
         return ResponseEntity.accepted()
                 .body(Map.of("jobId", jobId));

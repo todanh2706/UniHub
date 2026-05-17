@@ -140,28 +140,6 @@ INSERT INTO checkins (id, registration_id, checked_in_by, client_event_id, sourc
         'android-demo-001'
     );
 
-INSERT INTO csv_import_jobs (id, file_name, file_checksum, status, total_rows, success_rows, failed_rows, started_at, finished_at) VALUES
-    (
-        '3A000000-0000-0000-0000-000000000001',
-        'sample_students_500.csv',
-        'demo-checksum-500',
-        'SUCCESS',
-        500,
-        498,
-        2,
-        NOW() - INTERVAL '2 hours',
-        NOW() - INTERVAL '1 hour'
-    );
-
-INSERT INTO csv_import_errors (id, job_id, row_number, raw_data, error_code, error_message) VALUES
-    (
-        '3B000000-0000-0000-0000-000000000001',
-        '3A000000-0000-0000-0000-000000000001',
-        233,
-        'bad,row,data',
-        'INVALID_EMAIL',
-        'Email format is invalid'
-    );
 
 INSERT INTO notifications (id, user_id, type, title, body, data) VALUES
     (

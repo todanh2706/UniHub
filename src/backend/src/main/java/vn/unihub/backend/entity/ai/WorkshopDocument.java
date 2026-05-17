@@ -1,5 +1,6 @@
 package vn.unihub.backend.entity.ai;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import vn.unihub.backend.entity.catalog.Workshop;
@@ -21,6 +22,7 @@ public class WorkshopDocument {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workshop_id", nullable = false)
+    @JsonIgnore
     private Workshop workshop;
 
     @Column(name = "file_url", nullable = false)

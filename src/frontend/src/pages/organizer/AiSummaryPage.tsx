@@ -96,6 +96,16 @@ const AiSummaryPage: React.FC = () => {
     }
   };
 
+  const isValidFileType = (file: File) => {
+    const name = file.name.toLowerCase();
+    return file.type.includes('pdf') || 
+           file.type.includes('markdown') || 
+           file.type.includes('text/plain') || 
+           name.endsWith('.pdf') || 
+           name.endsWith('.md') || 
+           name.endsWith('.txt');
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -103,8 +113,8 @@ const AiSummaryPage: React.FC = () => {
         setError('File too large. Maximum size is 10MB.');
         return;
       }
-      if (!file.type.includes('pdf') && !file.name.endsWith('.pdf')) {
-        setError('Only PDF files are accepted.');
+      if (!isValidFileType(file)) {
+        setError('Only PDF, Markdown (.md), and plain text (.txt) files are accepted.');
         return;
       }
       handleUpload(file);
@@ -117,8 +127,8 @@ const AiSummaryPage: React.FC = () => {
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      if (!file.type.includes('pdf') && !file.name.endsWith('.pdf')) {
-        setError('Only PDF files are accepted.');
+      if (!isValidFileType(file)) {
+        setError('Only PDF, Markdown (.md), and plain text (.txt) files are accepted.');
         return;
       }
       if (file.size > 10 * 1024 * 1024) {
@@ -181,7 +191,7 @@ const AiSummaryPage: React.FC = () => {
         <input
           id="pdf-upload"
           type="file"
-          accept=".pdf,application/pdf"
+          accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
           onChange={handleFileChange}
           style={{ display: 'none' }}
         />
@@ -195,7 +205,7 @@ const AiSummaryPage: React.FC = () => {
             <Upload size={40} style={{ color: 'var(--primary-color)' }} />
             <div>
               <p style={{ color: 'var(--text-heading)', fontWeight: '600', margin: 0 }}>
-                Drop a PDF file here or click to upload
+                Drop a PDF, Markdown, or text file here or click to upload
               </p>
               <p style={{ color: 'var(--text-body)', fontSize: '14px', margin: '4px 0 0' }}>
                 Maximum file size: 10MB

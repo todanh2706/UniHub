@@ -52,6 +52,17 @@ interface Registration {
   createdAt: string;
 }
 
+interface AiSummaryResponse {
+  id: string;
+  documentId: string;
+  model: string;
+  status: string;
+  summaryText?: string;
+  errorMessage?: string;
+  createdAt: string;
+}
+
+
 const WorkshopDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -65,6 +76,22 @@ const WorkshopDetails: React.FC = () => {
     queryFn: async () => {
       const response = await api.get(`/workshops/${id}`);
       return response.data;
+    },
+    enabled: !!id
+  });
+
+  // Fetch AI summary using public endpoint
+  const { data: aiSummary } = useQuery<AiSummaryResponse | null>({
+    queryKey: ['workshop-summary', id],
+    queryFn: async () => {
+      try {
+        const response = await api.get(`/public/workshops/${id}/summary`);
+        if (response.status === 204 || !response.data) return null;
+        return response.data;
+      } catch (err) {
+        console.error('Failed to fetch AI summary', err);
+        return null;
+      }
     },
     enabled: !!id
   });
@@ -259,6 +286,81 @@ const WorkshopDetails: React.FC = () => {
                     {workshop.description}
                   </div>
                 </div>
+
+                {/* AI Summary Section */}
+                {aiSummary && aiSummary.status === 'COMPLETED' && aiSummary.summaryText && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%)',
+                      border: '1px solid rgba(139, 92, 246, 0.2)',
+                      borderRadius: 'var(--radius-xl)',
+                      padding: '32px',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      boxShadow: '0 10px 30px -15px rgba(139, 92, 246, 0.1)',
+                    }}
+                  >
+                    {/* Decorative glowing gradient blur */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-50px',
+                      right: '-50px',
+                      width: '150px',
+                      height: '150px',
+                      background: 'radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0) 70%)',
+                      filter: 'blur(20px)',
+                      pointerEvents: 'none'
+                    }}></div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                      <div style={{
+                        background: 'linear-gradient(135deg, var(--primary-color) 0%, #8b5cf6 100%)',
+                        padding: '10px',
+                        borderRadius: 'var(--radius-lg)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+                      }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/><path d="m5 3 1 2.5L8.5 6 6 7 5 9.5 4 7 1.5 6 4 5Z"/><path d="m19 17 1 2.5 2.5.5-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1Z"/></svg>
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>AI Workshop Summary</h3>
+                          <span style={{
+                            background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
+                            color: 'white',
+                            padding: '2px 8px',
+                            borderRadius: 'var(--radius-pill)',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                          }}>Smart AI</span>
+                        </div>
+                        <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--text-body)', opacity: 0.8 }}>Automatically generated from the workshop introductory document</p>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      fontSize: '16px',
+                      color: 'var(--text-body)',
+                      lineHeight: '1.75',
+                      fontWeight: '500',
+                      background: 'rgba(255, 255, 255, 0.4)',
+                      padding: '20px',
+                      borderRadius: 'var(--radius-lg)',
+                      border: '1px solid rgba(255, 255, 255, 0.6)',
+                      backdropFilter: 'blur(8px)',
+                      boxShadow: 'inset 0 1px 2px rgba(255, 255, 255, 0.8)'
+                    }}>
+                      {aiSummary.summaryText}
+                    </div>
+                  </motion.div>
+                )}
 
                 <div style={{ marginTop: '40px', padding: '24px', background: 'var(--neutral-100)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', gap: '20px' }}>
                   <ShieldCheck size={40} color="var(--primary-color)" />
