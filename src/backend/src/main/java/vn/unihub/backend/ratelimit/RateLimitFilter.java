@@ -40,14 +40,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
         List<RateLimitProperties.Policy> configPolicies = rateLimitProperties.getPolicies();
 
         for (RateLimitPolicy policy : dbPolicies) {
-            if (matches(policy.getEndpoint(), path) && tryConsumeAndCheck(policy, request, response)) {
+            if (matches(policy.getEndpoint(), method, path) && tryConsumeAndCheck(policy, request, response)) {
                 return;
             }
         }
 
         for (RateLimitProperties.Policy configPolicy : configPolicies) {
             if (!configPolicy.isEnabled()) continue;
-            if (matches(configPolicy.getEndpoint(), path)
+            if (matches(configPolicy.getEndpoint(), method, path)
                     && tryConsumeAndCheck(configPolicy, request, response)) {
                 return;
             }
@@ -137,9 +137,22 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return request.getRemoteAddr();
     }
 
-    private boolean matches(String pattern, String path) {
-        // Simple prefix + path matching
-        String normalizedPattern = normalizePath(pattern);
+    private boolean matches(String pattern, String requestMethod, String path) {
+        if (pattern == null) return false;
+        
+        String cleanPattern = pattern;
+        if (pattern.contains(":")) {
+            String[] parts = pattern.split(":", 2);
+            String methodPart = parts[0].trim();
+            String pathPart = parts[1].trim();
+            
+            if (!methodPart.equalsIgnoreCase(requestMethod)) {
+                return false;
+            }
+            cleanPattern = pathPart;
+        }
+        
+        String normalizedPattern = normalizePath(cleanPattern);
         if (normalizedPattern.endsWith("/**")) {
             String prefix = normalizedPattern.replace("/**", "");
             return path.startsWith(prefix);
