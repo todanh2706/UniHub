@@ -12,7 +12,7 @@ Dự án tập trung giải quyết các thách thức kỹ thuật lớn: xử 
 |---|---|
 | Backend | Java 21 · Spring Boot 4 · Maven |
 | Frontend (Web) | React 19 · Vite 8 · TypeScript |
-| Mobile Check-in | React Native · Expo SDK 51 |
+| Mobile Check-in | React Native · Expo SDK 54 |
 | Database | PostgreSQL 16 · Redis 8 |
 | Infrastructure | Docker · Docker Compose · Flyway |
 
@@ -235,7 +235,7 @@ npm install --legacy-peer-deps
 ```
 
 > [!NOTE]
-> Flag `--legacy-peer-deps` là **bắt buộc** để tránh lỗi xung đột phiên bản giữa React Native và Expo SDK 51.
+> Flag `--legacy-peer-deps` là **bắt buộc** để tránh lỗi xung đột phiên bản giữa React Native và Expo SDK 54.
 >
 > Dự án có sử dụng một Custom Expo Plugin tên `withCameraMaven.js` để tự động fix lỗi thiếu thư viện `com.google.android:cameraview:1.0.0` khi build Android. Bạn **không cần** sửa tay bất kỳ file Gradle nào.
 

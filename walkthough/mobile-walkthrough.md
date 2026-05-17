@@ -33,7 +33,7 @@ export ANDROID_HOME="/Users/$(whoami)/Library/Android/sdk"
 ## 3. Cài đặt Dependencies
 
 Mở Terminal, di chuyển vào thư mục dự án và cài đặt các thư viện. 
-**Chú ý:** Luôn sử dụng cờ `--legacy-peer-deps` để tránh các lỗi xung đột phiên bản của React Native với Expo SDK 51.
+**Chú ý:** Luôn sử dụng cờ `--legacy-peer-deps` để tránh các lỗi xung đột phiên bản của React Native với Expo SDK 54.
 
 ```bash
 cd src/mobile-checkin
