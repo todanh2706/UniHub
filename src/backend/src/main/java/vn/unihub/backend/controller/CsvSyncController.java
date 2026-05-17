@@ -35,8 +35,7 @@ public class CsvSyncController {
                     .body(Map.of("error", "SYNC_IN_PROGRESS",
                             "message", "A CSV sync is already in progress"));
         }
-        CompletableFuture<UUID> future = csvSyncService.triggerSync();
-        UUID jobId = future.join();
+        UUID jobId = csvSyncService.triggerSync();
         if (jobId == null) {
             return ResponseEntity.ok()
                     .body(Map.of("message", "No new or unprocessed CSV files found"));

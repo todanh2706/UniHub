@@ -108,17 +108,9 @@ public class AiSummaryService {
             throw new RuntimeException("Failed to save uploaded file", e);
         }
 
-        // --- Stage 2: Create WorkshopDocument record ---
-        WorkshopDocument document = WorkshopDocument.builder()
-                .workshop(workshop)
-                .fileUrl(filePath.toAbsolutePath().toString())
-                .fileName(originalFilename)
-                .mimeType("application/pdf")
-                .fileSize(file.getSize())
-                .processingStatus("EXTRACTING")
-                .build();
+        // --- Stage 2.5: Update WorkshopDocument record with file path ---
+        document.setFileUrl(filePath.toAbsolutePath().toString());
         document = documentRepository.save(document);
-        UUID documentId = document.getId();
 
         // --- Stage 3: Extract text (Pipe Filter 1) ---
         String extractedText;
