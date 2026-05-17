@@ -2,9 +2,6 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api/v1',
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Generate idempotency key for mutation requests
@@ -16,7 +13,23 @@ function generateIdempotencyKey(): string {
     });
 }
 
-// Add a request interceptor to attach the token and idempotency key
+export function getScopedIdempotencyKey(scope: string): string {
+  const storageKey = `idem:${scope}`;
+  const existing = sessionStorage.getItem(storageKey);
+  if (existing) {
+    return existing;
+  }
+
+  const nextKey = generateIdempotencyKey();
+  sessionStorage.setItem(storageKey, nextKey);
+  return nextKey;
+}
+
+export function clearScopedIdempotencyKey(scope: string): void {
+  sessionStorage.removeItem(`idem:${scope}`);
+}
+
+// Add a request interceptor to attach the token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -26,10 +39,11 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Add Idempotency-Key for POST/PUT/PATCH/DELETE requests
-    const mutationMethods = ['post', 'put', 'patch', 'delete'];
-    if (config.method && mutationMethods.includes(config.method.toLowerCase())) {
-      config.headers['Idempotency-Key'] = generateIdempotencyKey();
+    const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
+    if (isFormData) {
+      delete config.headers['Content-Type'];
+    } else if (!config.headers['Content-Type']) {
+      config.headers['Content-Type'] = 'application/json';
     }
 
     return config;
@@ -70,9 +84,8 @@ api.interceptors.response.use(
         console.warn('Previous request still processing. Please wait.');
         return Promise.reject(error);
       }
-      if (errorCode === 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST') {
+      if (errorCode === 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST' && originalRequest?.headers?.['Idempotency-Key']) {
         console.error('Idempotency key conflict. Generating new key...');
-        // Retry with a new idempotency key
         originalRequest.headers['Idempotency-Key'] = generateIdempotencyKey();
         return api(originalRequest);
       }

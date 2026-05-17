@@ -1,6 +1,7 @@
 package vn.unihub.backend.controller;
 
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -50,12 +51,13 @@ public class RegistrationController {
 
     @PostMapping("/registrations")
     @PreAuthorize("hasRole('STUDENT')")
-    public RegistrationResponse createRegistration(
+    public ResponseEntity<RegistrationResponse> createRegistration(
             @RequestBody CreateRegistrationRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             Authentication authentication) {
         User user = currentUser(authentication);
-        return registrationService.createRegistration(user, request.workshopId(), idempotencyKey);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(registrationService.createRegistration(user, request.workshopId(), idempotencyKey));
     }
 
     @GetMapping("/registrations/me")

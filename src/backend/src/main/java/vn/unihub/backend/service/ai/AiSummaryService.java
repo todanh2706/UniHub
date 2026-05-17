@@ -8,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 import vn.unihub.backend.config.AiProperties;
 import vn.unihub.backend.dto.ai.AiSummaryResponse;
 import vn.unihub.backend.dto.ai.DocumentUploadResponse;
+import vn.unihub.backend.dto.ai.WorkshopDocumentResponse;
 import vn.unihub.backend.entity.ai.AiSummary;
 import vn.unihub.backend.entity.ai.WorkshopDocument;
 import vn.unihub.backend.entity.catalog.Workshop;
@@ -96,24 +97,28 @@ public class AiSummaryService {
             throw new RuntimeException("Cannot create storage directory", e);
         }
 
-        String ext = isPdf ? ".pdf" : (isMd ? ".md" : ".txt");
-        String storageFilename = documentId + ext;
+        UUID storageId = UUID.randomUUID();
+        String storageFilename = storageId + ".pdf";
         Path filePath = docsDir.resolve(storageFilename);
 
-        try {
-            // Fix: use Standard Java NIO copy instead of Tomcat's transferTo to bypass container upload constraints
-            Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        try (var inputStream = file.getInputStream()) {
+            Files.copy(inputStream, filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            log.error("Failed to save uploaded file: {}", originalFilename, e);
-            document.setProcessingStatus("EXTRACTION_FAILED");
-            document.setErrorMessage("Failed to save file: " + e.getMessage());
-            documentRepository.save(document);
-            throw new RuntimeException("Failed to save uploaded file: " + e.getMessage(), e);
+            log.error("Failed to save uploaded file to {}: {}", filePath, originalFilename, e);
+            throw new RuntimeException("Failed to save uploaded file", e);
         }
 
-        // Update the fileUrl to the absolute path
-        document.setFileUrl(filePath.toAbsolutePath().toString());
-        documentRepository.save(document);
+        // --- Stage 2: Create WorkshopDocument record ---
+        WorkshopDocument document = WorkshopDocument.builder()
+                .workshop(workshop)
+                .fileUrl(filePath.toAbsolutePath().toString())
+                .fileName(originalFilename)
+                .mimeType("application/pdf")
+                .fileSize(file.getSize())
+                .processingStatus("EXTRACTING")
+                .build();
+        document = documentRepository.save(document);
+        UUID documentId = document.getId();
 
         // --- Stage 3: Extract text (Pipe Filter 1) ---
         String extractedText;
@@ -214,13 +219,24 @@ public class AiSummaryService {
     /**
      * Get documents for a workshop.
      */
-    public List<WorkshopDocument> getDocuments(UUID workshopId) {
-        return documentRepository.findByWorkshopId(workshopId);
+    @Transactional(readOnly = true)
+    public List<WorkshopDocumentResponse> getDocuments(UUID workshopId) {
+        return documentRepository.findByWorkshopId(workshopId).stream()
+                .map(d -> new WorkshopDocumentResponse(
+                        d.getId(),
+                        d.getFileName(),
+                        d.getFileSize(),
+                        d.getMimeType(),
+                        d.getProcessingStatus(),
+                        d.getErrorMessage()
+                ))
+                .toList();
     }
 
     /**
      * Get the latest summary for a workshop (via its most recent document).
      */
+    @Transactional(readOnly = true)
     public AiSummaryResponse getLatestSummary(UUID workshopId) {
         List<WorkshopDocument> documents = documentRepository.findByWorkshopId(workshopId);
         if (documents.isEmpty()) {

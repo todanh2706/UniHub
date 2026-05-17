@@ -72,9 +72,7 @@ const AiSummaryPage: React.FC = () => {
     formData.append('file', file);
 
     try {
-      await api.post(`/ai/workshops/${workshopId}/documents`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      await api.post(`/ai/workshops/${workshopId}/documents`, formData);
       await fetchData();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Upload failed');

@@ -111,6 +111,14 @@
   * "Khi đăng ký Workshop có phí, nếu cổng thanh toán bên thứ ba gặp sự cố, hệ thống sử dụng Circuit Breaker để ngắt mạch (Open). Điều này giúp các dịch vụ cốt lõi như xem lịch vẫn hoạt động bình thường thay vì bị sập theo."
   * "Ngoài ra, để chống trừ tiền hai lần khi sinh viên bấm đúp hoặc mạng lag tự retry, nhóm cài đặt cơ chế Idempotency Key. Khi em gửi 2 request trùng Key liên tiếp, request thứ 2 sẽ bị chặn lại ở tầng Cache, đảm bảo giao dịch chỉ được xử lý đúng một lần."
 
+### CHECKLIST QA NHANH CHO MOCK PAYMENT FLOW
+* **Success flow:** Đăng ký workshop có phí -> vào trang mock provider -> bấm **Simulate Success** -> quay lại `My Registrations` -> trạng thái chuyển `CONFIRMED`, có QR.
+* **Fail flow:** Đăng ký workshop có phí -> vào mock provider -> bấm **Simulate Failure** -> quay lại `My Registrations` -> vẫn `PENDING_PAYMENT`, có nút `Retry Payment`.
+* **Timeout flow:** Đăng ký workshop có phí -> vào mock provider -> bấm **Simulate Timeout** -> quay lại `My Registrations` -> `Check Payment Status` -> payment chuyển `TIMEOUT` -> `Retry Payment` mở lại checkout.
+* **Duplicate submit safety:** Ở các thao tác `Register`, `Pay Now`, `Retry Payment`, `Cancel`, bấm nhanh nhiều lần hoặc refresh chậm -> backend không tạo thêm registration/payment ngoài ý muốn vì request được giữ bằng `Idempotency-Key` ổn định theo action.
+* **Late callback safety:** Nếu registration đã `CANCELLED` hoặc payment đã `SUCCEEDED`, gửi lại outcome từ mock provider không được đổi ngược trạng thái hoặc tạo charge mới.
+* **Blast radius check:** Khi mock payment bị fail/timeout liên tục, các API xem workshop, xem lịch và các luồng không liên quan vẫn hoạt động bình thường.
+
 ---
 
 ## CLIP 4: MOBILE & TỔNG KẾT (Người trình bày: Danh)

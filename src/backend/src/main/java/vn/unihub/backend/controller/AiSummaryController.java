@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import vn.unihub.backend.dto.ai.AiSummaryResponse;
 import vn.unihub.backend.dto.ai.DocumentUploadResponse;
-import vn.unihub.backend.entity.ai.WorkshopDocument;
+import vn.unihub.backend.dto.ai.WorkshopDocumentResponse;
 import vn.unihub.backend.service.ai.AiSummaryService;
 
 import java.util.List;
@@ -37,7 +37,7 @@ public class AiSummaryController {
      */
     @GetMapping("/workshops/{workshopId}/documents")
     @PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER')")
-    public ResponseEntity<List<WorkshopDocument>> listDocuments(@PathVariable UUID workshopId) {
+    public ResponseEntity<List<WorkshopDocumentResponse>> listDocuments(@PathVariable UUID workshopId) {
         return ResponseEntity.ok(aiSummaryService.getDocuments(workshopId));
     }
 
