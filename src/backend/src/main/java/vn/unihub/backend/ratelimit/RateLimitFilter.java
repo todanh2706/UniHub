@@ -15,6 +15,7 @@ import vn.unihub.backend.entity.audit.RateLimitPolicy;
 import vn.unihub.backend.repository.RateLimitPolicyRepository;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 
 @Slf4j
@@ -31,24 +32,38 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String path = request.getRequestURI();
-        String method = request.getMethod();
-        String endpoint = method + ":" + reducePath(path);
+        String requestMethod = normalizeMethod(request.getMethod());
+        String requestPath = normalizeRequestPath(request.getRequestURI());
 
-        // Find matching policies for this endpoint
-        List<RateLimitPolicy> dbPolicies = policyRepository.findByEnabledTrue();
-        List<RateLimitProperties.Policy> configPolicies = rateLimitProperties.getPolicies();
+        List<RateLimitPolicy> matchingDbPolicies = policyRepository.findByEnabledTrue().stream()
+                .filter(policy -> matches(policy.getEndpoint(), requestMethod, requestPath))
+                .sorted(Comparator.comparing(RateLimitPolicy::getEndpoint)
+                        .thenComparing(RateLimitPolicy::getScope)
+                        .thenComparing(RateLimitPolicy::getWindowSeconds)
+                        .thenComparing(RateLimitPolicy::getLimitValue))
+                .toList();
 
-        for (RateLimitPolicy policy : dbPolicies) {
-            if (matches(policy.getEndpoint(), method, path) && tryConsumeAndCheck(policy, request, response)) {
-                return;
+        if (!matchingDbPolicies.isEmpty()) {
+            for (RateLimitPolicy policy : matchingDbPolicies) {
+                if (tryConsumeAndCheck(policy, request, response)) {
+                    return;
+                }
             }
+            filterChain.doFilter(request, response);
+            return;
         }
 
-        for (RateLimitProperties.Policy configPolicy : configPolicies) {
-            if (!configPolicy.isEnabled()) continue;
-            if (matches(configPolicy.getEndpoint(), method, path)
-                    && tryConsumeAndCheck(configPolicy, request, response)) {
+        List<RateLimitProperties.Policy> matchingConfigPolicies = rateLimitProperties.getPolicies().stream()
+                .filter(RateLimitProperties.Policy::isEnabled)
+                .filter(policy -> matches(policy.getEndpoint(), requestMethod, requestPath))
+                .sorted(Comparator.comparing(RateLimitProperties.Policy::getEndpoint)
+                        .thenComparing(RateLimitProperties.Policy::getScope)
+                        .thenComparing(RateLimitProperties.Policy::getWindowSeconds)
+                        .thenComparing(RateLimitProperties.Policy::getLimitValue))
+                .toList();
+
+        for (RateLimitProperties.Policy configPolicy : matchingConfigPolicies) {
+            if (tryConsumeAndCheck(configPolicy, request, response)) {
                 return;
             }
         }
@@ -130,39 +145,79 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String getClientIP(HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader != null && !xfHeader.isBlank()) {
-            return xfHeader.split(",")[0].trim();
+        String remoteAddress = request.getRemoteAddr();
+        if (!isTrustedProxy(remoteAddress)) {
+            return remoteAddress;
         }
-        return request.getRemoteAddr();
+
+        String xfHeader = request.getHeader("X-Forwarded-For");
+        String forwardedClientIp = extractForwardedClientIp(xfHeader);
+        return forwardedClientIp != null ? forwardedClientIp : remoteAddress;
     }
 
-    private boolean matches(String pattern, String requestMethod, String path) {
-        if (pattern == null) return false;
-        
-        String cleanPattern = pattern;
-        if (pattern.contains(":")) {
-            String[] parts = pattern.split(":", 2);
-            String methodPart = parts[0].trim();
-            String pathPart = parts[1].trim();
-            
-            if (!methodPart.equalsIgnoreCase(requestMethod)) {
-                return false;
+    private String extractForwardedClientIp(String xForwardedForHeader) {
+        if (xForwardedForHeader == null || xForwardedForHeader.isBlank()) {
+            return null;
+        }
+
+        for (String candidate : xForwardedForHeader.split(",")) {
+            String ip = candidate.trim();
+            if (!ip.isEmpty()) {
+                return ip;
             }
-            cleanPattern = pathPart;
         }
-        
-        String normalizedPattern = normalizePath(cleanPattern);
-        if (normalizedPattern.endsWith("/**")) {
-            String prefix = normalizedPattern.replace("/**", "");
-            return path.startsWith(prefix);
+        return null;
+    }
+
+    private boolean isTrustedProxy(String remoteAddress) {
+        return rateLimitProperties.isTrustedProxy(remoteAddress);
+    }
+
+    private boolean matches(String configuredEndpoint, String requestMethod, String requestPath) {
+        EndpointPattern endpointPattern = parseEndpoint(configuredEndpoint);
+        if (endpointPattern.method() != null && !endpointPattern.method().equals(requestMethod)) {
+            return false;
         }
-        return path.equals(normalizedPattern);
+
+        String normalizedPatternPath = endpointPattern.path();
+        if (normalizedPatternPath.endsWith("/**")) {
+            String prefix = normalizedPatternPath.substring(0, normalizedPatternPath.length() - 3);
+            return requestPath.startsWith(prefix);
+        }
+        return requestPath.equals(normalizedPatternPath);
+    }
+
+    private EndpointPattern parseEndpoint(String configuredEndpoint) {
+        if (configuredEndpoint == null || configuredEndpoint.isBlank()) {
+            return new EndpointPattern(null, "");
+        }
+
+        String normalized = configuredEndpoint.trim();
+        int separatorIndex = normalized.indexOf(':');
+        if (separatorIndex > 0 && separatorIndex + 1 < normalized.length()
+                && normalized.charAt(separatorIndex + 1) == '/') {
+            String method = normalizeMethod(normalized.substring(0, separatorIndex));
+            String path = normalizePath(normalized.substring(separatorIndex + 1));
+            return new EndpointPattern(method, path);
+        }
+
+        return new EndpointPattern(null, normalizePath(normalized));
+    }
+
+    private String normalizeMethod(String method) {
+        return method == null ? "" : method.trim().toUpperCase();
+    }
+
+    private String normalizeRequestPath(String path) {
+        return normalizePath(reducePath(path));
     }
 
     private String normalizePath(String path) {
-        if (path == null) return "";
-        return path.replaceAll("/+$", "");
+        if (path == null || path.isBlank()) {
+            return "";
+        }
+        String normalized = path.trim().replaceAll("/+$", "");
+        return normalized.isEmpty() ? "/" : normalized;
     }
 
     private String reducePath(String path) {
@@ -171,5 +226,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 "/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
                 "/{id}"
         );
+    }
+
+    private record EndpointPattern(String method, String path) {
     }
 }

@@ -40,8 +40,14 @@ public class Payment {
     @Column(name = "provider_transaction_id")
     private String providerTransactionId;
 
+    @Column(name = "checkout_token", unique = true)
+    private String checkoutToken;
+
     @Column(nullable = false)
     private String status;
+
+    @Column(name = "last_error_message")
+    private String lastErrorMessage;
 
     @Column(name = "requested_at", nullable = false)
     private Instant requestedAt;

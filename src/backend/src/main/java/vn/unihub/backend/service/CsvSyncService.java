@@ -67,6 +67,10 @@ public class CsvSyncService {
         return syncAllFiles();
     }
 
+    public boolean isRunning() {
+        return running.get();
+    }
+
     /**
      * Get the status of a specific job.
      */
