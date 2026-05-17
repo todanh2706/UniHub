@@ -13,6 +13,9 @@ import vn.unihub.backend.circuitbreaker.CircuitBreakerService;
 import vn.unihub.backend.exception.IdempotencyConflictException;
 import vn.unihub.backend.exception.PaymentUnavailableException;
 import vn.unihub.backend.exception.RateLimitedException;
+import vn.unihub.backend.exception.SyncInProgressException;
+
+import java.util.concurrent.CompletionException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -111,5 +114,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(503)
                 .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
                 .body(error);
+    }
+    @ExceptionHandler(SyncInProgressException.class)
+    public ResponseEntity<Map<String, Object>> handleSyncInProgress(SyncInProgressException ex) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("error", "SYNC_IN_PROGRESS");
+        error.put("message", ex.getMessage());
+        return ResponseEntity.status(409).body(error);
+    }
+
+    @ExceptionHandler(CompletionException.class)
+    public ResponseEntity<?> handleCompletionException(CompletionException ex) {
+        Throwable cause = ex.getCause();
+        if (cause instanceof SyncInProgressException syncEx) {
+            return handleSyncInProgress(syncEx);
+        }
+        if (cause instanceof RuntimeException runtimeEx) {
+            return handleRuntimeException(runtimeEx);
+        }
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", "An unexpected async error occurred"));
     }
 }

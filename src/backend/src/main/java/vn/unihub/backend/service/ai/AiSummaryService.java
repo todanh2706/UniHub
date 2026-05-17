@@ -56,25 +56,44 @@ public class AiSummaryService {
         Workshop workshop = workshopRepository.findById(workshopId)
                 .orElseThrow(() -> new IllegalArgumentException("Workshop not found: " + workshopId));
 
-        // Validate file is PDF
+        // Validate file type (PDF, Markdown, or Plain Text)
         String contentType = file.getContentType();
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null) {
             originalFilename = "unnamed.pdf";
         }
-        if (contentType == null || !contentType.equalsIgnoreCase("application/pdf")) {
-            // Fallback: check extension
-            if (!originalFilename.toLowerCase().endsWith(".pdf")) {
-                throw new IllegalArgumentException("Only PDF files are accepted. Got: " + contentType);
-            }
+
+        String lowerFilename = originalFilename.toLowerCase();
+        boolean isPdf = lowerFilename.endsWith(".pdf") || (contentType != null && contentType.equalsIgnoreCase("application/pdf"));
+        boolean isMd = lowerFilename.endsWith(".md") || (contentType != null && contentType.equalsIgnoreCase("text/markdown"));
+        boolean isTxt = lowerFilename.endsWith(".txt") || (contentType != null && contentType.equalsIgnoreCase("text/plain"));
+
+        if (!isPdf && !isMd && !isTxt) {
+            throw new IllegalArgumentException("Only PDF, Markdown (.md), and plain text (.txt) files are accepted.");
         }
 
-        // --- Stage 1: Save file to disk ---
+        // --- Stage 1: Create WorkshopDocument record first to let JPA generate a native UUID ---
+        WorkshopDocument document = WorkshopDocument.builder()
+                .workshop(workshop)
+                .fileUrl("TEMP")
+                .fileName(originalFilename)
+                .mimeType(isPdf ? "application/pdf" : (isMd ? "text/markdown" : "text/plain"))
+                .fileSize(file.getSize())
+                .processingStatus("EXTRACTING")
+                .build();
+        // Use saveAndFlush so that Hibernate generates and returns the key immediately
+        document = documentRepository.saveAndFlush(document);
+        UUID documentId = document.getId();
+
+        // --- Stage 2: Save file to disk using the generated UUID ---
         Path docsDir = Path.of(aiProperties.getDocsDir(), workshopId.toString());
         try {
             Files.createDirectories(docsDir);
         } catch (IOException e) {
             log.error("Failed to create document directory: {}", docsDir, e);
+            document.setProcessingStatus("EXTRACTION_FAILED");
+            document.setErrorMessage("Cannot create storage directory: " + e.getMessage());
+            documentRepository.save(document);
             throw new RuntimeException("Cannot create storage directory", e);
         }
 

@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import vn.unihub.backend.config.CsvSyncProperties;
 import vn.unihub.backend.entity.student.CsvImportError;
 import vn.unihub.backend.entity.student.CsvImportJob;
@@ -14,6 +16,7 @@ import vn.unihub.backend.entity.student.Student;
 import vn.unihub.backend.repository.student.CsvImportErrorRepository;
 import vn.unihub.backend.repository.student.CsvImportJobRepository;
 import vn.unihub.backend.repository.student.StudentRepository;
+import vn.unihub.backend.exception.SyncInProgressException;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -43,6 +46,7 @@ public class CsvSyncService {
     private final CsvImportJobRepository csvImportJobRepository;
     private final CsvImportErrorRepository csvImportErrorRepository;
     private final EntityManager entityManager;
+    private final PlatformTransactionManager transactionManager;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
 
@@ -58,10 +62,9 @@ public class CsvSyncService {
     /**
      * Manual async trigger – returns the job ID immediately.
      */
-    @Async
-    public CompletableFuture<UUID> triggerSync() {
+    public UUID triggerSync() {
         log.info("Manual CSV sync triggered");
-        return CompletableFuture.completedFuture(syncAllFiles());
+        return syncAllFiles();
     }
 
     public boolean isRunning() {
@@ -96,7 +99,7 @@ public class CsvSyncService {
     private UUID syncAllFiles() {
         if (!running.compareAndSet(false, true)) {
             log.warn("CSV sync already in progress, skipping");
-            return null;
+            throw new SyncInProgressException("A CSV sync is already in progress");
         }
 
         try {
@@ -104,6 +107,7 @@ public class CsvSyncService {
             if (!Files.exists(csvDir)) {
                 Files.createDirectories(csvDir);
                 log.info("Created CSV directory: {}", csvDir);
+                running.set(false);
                 return null;
             }
 
@@ -114,43 +118,74 @@ public class CsvSyncService {
 
             if (csvFiles.isEmpty()) {
                 log.info("No CSV files found in {}", csvDir);
+                running.set(false);
                 return null;
             }
 
-            UUID lastJobId = null;
+            List<Path> filesToProcess = new ArrayList<>();
             for (Path file : csvFiles) {
                 String checksum = computeChecksum(file);
-                if (csvImportJobRepository.findByFileChecksum(checksum).isPresent()) {
-                    log.info("Skipping already imported file: {} (checksum: {})", file.getFileName(), checksum);
-                    continue;
+                if (csvImportJobRepository.findByFileChecksum(checksum).isEmpty()) {
+                    filesToProcess.add(file);
                 }
-                lastJobId = processFile(file, checksum);
             }
 
-            return lastJobId;
-        } catch (IOException e) {
-            log.error("Error scanning CSV directory: {}", e.getMessage(), e);
-            return null;
-        } finally {
+            if (filesToProcess.isEmpty()) {
+                log.info("No new CSV files found (all already imported)");
+                running.set(false);
+                return null;
+            }
+
+            // Create job records for all new files immediately
+            List<CsvImportJob> jobs = new ArrayList<>();
+            for (Path file : filesToProcess) {
+                String checksum = computeChecksum(file);
+                CsvImportJob job = CsvImportJob.builder()
+                        .fileName(file.getFileName().toString())
+                        .fileChecksum(checksum)
+                        .status("PROCESSING")
+                        .totalRows(0)
+                        .successRows(0)
+                        .failedRows(0)
+                        .startedAt(Instant.now())
+                        .build();
+                jobs.add(csvImportJobRepository.save(job));
+            }
+
+            // Start processing in the background
+            CompletableFuture.runAsync(() -> {
+                TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+                try {
+                    for (int i = 0; i < filesToProcess.size(); i++) {
+                        final int index = i;
+                        transactionTemplate.executeWithoutResult(status -> {
+                            try {
+                                processFileContent(jobs.get(index), filesToProcess.get(index));
+                            } catch (Exception e) {
+                                log.error("Error processing file {}: {}", filesToProcess.get(index), e.getMessage(), e);
+                            }
+                        });
+                    }
+                } finally {
+                    running.set(false);
+                }
+            });
+
+            // Return the ID of the first job so the UI can poll it
+            return jobs.get(0).getId();
+        } catch (Exception e) {
+            log.error("Error starting CSV sync: {}", e.getMessage(), e);
             running.set(false);
+            return null;
         }
     }
 
-    @Transactional
-    protected UUID processFile(Path file, String checksum) throws IOException {
+    protected void processFileContent(CsvImportJob job, Path file) throws IOException {
         String fileName = file.getFileName().toString();
-
-        CsvImportJob job = CsvImportJob.builder()
-                .fileName(fileName)
-                .fileChecksum(checksum)
-                .status("PROCESSING")
-                .totalRows(0)
-                .successRows(0)
-                .failedRows(0)
-                .startedAt(Instant.now())
-                .build();
-        job = csvImportJobRepository.save(job);
-        final CsvImportJob savedJob = job;
+        log.info("Processing CSV file: {}", fileName);
+        
+        // Use a fresh reference to the job in this transaction
+        final CsvImportJob savedJob = csvImportJobRepository.findById(job.getId()).orElse(job);
 
         int totalRows = 0;
         int successRows = 0;
@@ -163,7 +198,7 @@ public class CsvSyncService {
                 savedJob.setStatus("COMPLETED");
                 savedJob.setFinishedAt(Instant.now());
                 csvImportJobRepository.save(savedJob);
-                return savedJob.getId();
+                return;
             }
 
             // Determine column mapping from header
@@ -182,7 +217,7 @@ public class CsvSyncService {
                 savedJob.setStatus("FAILED");
                 savedJob.setFinishedAt(Instant.now());
                 csvImportJobRepository.save(savedJob);
-                return savedJob.getId();
+                return;
             }
 
             String line;
@@ -256,7 +291,6 @@ public class CsvSyncService {
 
         log.info("CSV import completed: file={}, total={}, success={}, failed={}",
                 fileName, totalRows, successRows, failedRows);
-        return savedJob.getId();
     }
 
     private void upsertStudent(String studentCode, String fullName, String email,

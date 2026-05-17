@@ -45,6 +45,7 @@ const CsvSyncPage: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
   const [jobErrors, setJobErrors] = useState<Record<string, CsvError[]>>({});
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -102,6 +103,7 @@ const CsvSyncPage: React.FC = () => {
 
   const handleSync = async () => {
     setError(null);
+    setMessage(null);
     setIsSyncing(true);
 
     try {
@@ -121,12 +123,12 @@ const CsvSyncPage: React.FC = () => {
         }, ...prev]);
         startPolling(jobId);
       } else {
-        setError('Sync completed but no new files were found.');
+        setMessage('No new CSV files were found to sync.');
         setIsSyncing(false);
       }
     } catch (err: any) {
       if (err.response?.status === 409) {
-        setError('A sync is already in progress.');
+        setError(err.response.data?.message || 'A sync is already in progress.');
       } else {
         setError(err.response?.data?.message || err.message || 'Failed to trigger sync');
       }
@@ -189,6 +191,20 @@ const CsvSyncPage: React.FC = () => {
           <span>{error}</span>
           <button
             onClick={() => setError(null)}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Message alert */}
+      {message && (
+        <div className="alert alert-info" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(79, 70, 229, 0.1)', color: 'var(--primary-color)', border: '1px solid var(--primary-color)' }}>
+          <CheckCircle size={18} />
+          <span>{message}</span>
+          <button
+            onClick={() => setMessage(null)}
             style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
           >
             ×
