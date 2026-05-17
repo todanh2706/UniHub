@@ -1,20 +1,22 @@
 package vn.unihub.backend.idempotency;
 
-import jakarta.servlet.*;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ReadListener;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.util.ContentCachingRequestWrapper;
-import vn.unihub.backend.entity.auth.User;
 import vn.unihub.backend.exception.IdempotencyConflictException;
-import vn.unihub.backend.security.CustomUserDetails;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
@@ -38,26 +40,24 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Check if response is already cached
-        String cachedResponse = idempotencyService.getCachedResponse(idempotencyKey);
-        if (cachedResponse != null && !"IN_PROGRESS".equals(cachedResponse)) {
-            response.setContentType("application/json;charset=UTF-8");
-            response.setStatus(200);
-            response.getWriter().write(cachedResponse);
-            log.info("Replayed idempotent response for key: {}", idempotencyKey);
-            return;
-        }
-
-        // Wrap request to cache body for idempotency check
-        ContentCachingRequestWrapper wrappedRequest = new ContentCachingRequestWrapper(request, -1);
+        CachedBodyHttpServletRequest wrappedRequest = new CachedBodyHttpServletRequest(request);
+        String requestBody = new String(wrappedRequest.getCachedBody(), StandardCharsets.UTF_8);
 
         try {
+            IdempotencyService.CachedResult cachedResult = idempotencyService.getCachedResult(
+                    idempotencyKey,
+                    request.getRequestURI(),
+                    requestBody
+            );
+            if (cachedResult != null) {
+                response.setContentType("application/json;charset=UTF-8");
+                response.setStatus(cachedResult.statusCode());
+                response.getWriter().write(cachedResult.responseBody());
+                log.info("Replayed idempotent response for key: {}", idempotencyKey);
+                return;
+            }
+
             filterChain.doFilter(wrappedRequest, response);
-
-            // After successful processing, extract body and register idempotency
-            // Note: For idempotency on POST /registrations, the controller handles it
-            // This filter only handles replay
-
         } catch (Exception e) {
             if (e instanceof IdempotencyConflictException) {
                 handleConflict((IdempotencyConflictException) e, response);
@@ -83,11 +83,47 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         ));
     }
 
-    private User currentUser() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof CustomUserDetails userDetails) {
-            return userDetails.getUser();
+    private static class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
+        private final byte[] cachedBody;
+
+        private CachedBodyHttpServletRequest(HttpServletRequest request) throws IOException {
+            super(request);
+            this.cachedBody = request.getInputStream().readAllBytes();
         }
-        return null;
+
+        private byte[] getCachedBody() {
+            return cachedBody;
+        }
+
+        @Override
+        public ServletInputStream getInputStream() {
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(cachedBody);
+            return new ServletInputStream() {
+                @Override
+                public int read() {
+                    return inputStream.read();
+                }
+
+                @Override
+                public boolean isFinished() {
+                    return inputStream.available() == 0;
+                }
+
+                @Override
+                public boolean isReady() {
+                    return true;
+                }
+
+                @Override
+                public void setReadListener(ReadListener readListener) {
+                    // no-op
+                }
+            };
+        }
+
+        @Override
+        public BufferedReader getReader() {
+            return new BufferedReader(new InputStreamReader(getInputStream(), StandardCharsets.UTF_8));
+        }
     }
 }

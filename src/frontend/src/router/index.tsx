@@ -5,6 +5,7 @@ import StudentHome from '../pages/student/Home';
 import StudentWorkshopDetails from '../pages/student/WorkshopDetails';
 import AllWorkshops from '../pages/student/AllWorkshops';
 import MyRegistrations from '../pages/student/MyRegistrations';
+import MockPaymentProvider from '../pages/student/MockPaymentProvider';
 
 import AdminLayout from '../pages/admin/Layout';
 import AdminDashboard from '../pages/admin/Dashboard';
@@ -46,6 +47,16 @@ export const router = createBrowserRouter([
           {
             index: true,
             element: <MyRegistrations />
+          }
+        ]
+      },
+      {
+        path: 'mock-payment/:checkoutToken',
+        element: <ProtectedRoute />,
+        children: [
+          {
+            index: true,
+            element: <MockPaymentProvider />
           }
         ]
       },

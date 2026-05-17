@@ -64,6 +64,10 @@ public class CsvSyncService {
         return CompletableFuture.completedFuture(syncAllFiles());
     }
 
+    public boolean isRunning() {
+        return running.get();
+    }
+
     /**
      * Get the status of a specific job.
      */

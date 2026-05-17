@@ -14,6 +14,11 @@ public record RegistrationResponse(
         Instant confirmedAt,
         Instant cancelledAt,
         Instant workshopStartTime,
-        Instant workshopEndTime
+        Instant workshopEndTime,
+        String paymentStatus,
+        Instant paymentExpiresAt,
+        boolean canOpenPaymentCheckout,
+        boolean canRetryPayment,
+        boolean canCheckPaymentStatus
 ) {
 }

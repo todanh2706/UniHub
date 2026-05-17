@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   Calendar, 
   MapPin, 
@@ -16,7 +16,8 @@ import {
   ArrowRight,
   Ticket
 } from 'lucide-react';
-import api from '../../api/axios';
+import api, { clearScopedIdempotencyKey, getScopedIdempotencyKey } from '../../api/axios';
+import ApiErrorNotice from '../../components/ApiErrorNotice';
 import { useAuthStore } from '../../store/authStore';
 import '../../styles/Skeleton.css';
 
@@ -52,18 +53,28 @@ interface Registration {
   createdAt: string;
 }
 
+interface CreatedRegistration {
+  id: string;
+  status: string;
+}
+
+interface PaymentCheckout {
+  checkoutUrl: string;
+}
+
 const WorkshopDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuthStore();
-  const [error, setError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<ApiError | null>(null);
+  const [registerCooldownMs, setRegisterCooldownMs] = useState<number | null>(null);
 
   // Fetch workshop details
   const { data: workshop, isLoading, isError } = useQuery<WorkshopDetail>({
     queryKey: ['workshop', id],
     queryFn: async () => {
-      const response = await api.get(`/workshops/${id}`);
+      const response = await api.get(`/public/workshops/${id}`);
       return response.data;
     },
     enabled: !!id
@@ -80,22 +91,71 @@ const WorkshopDetails: React.FC = () => {
   });
 
   const isAlreadyRegistered = myRegistrations?.some(r => r.workshopId === id && r.status !== 'CANCELLED');
-  const existingRegistration = myRegistrations?.find(r => r.workshopId === id && r.status !== 'CANCELLED');
+
+  type ApiError = {
+    message?: string;
+    response?: {
+      status?: number;
+      data?: {
+        error?: string;
+        message?: string;
+        retryAfterSeconds?: number;
+      };
+      headers?: {
+        'retry-after'?: string | number;
+      };
+    };
+  };
+
+  useEffect(() => {
+    if (registerCooldownMs === null) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setRegisterCooldownMs(null);
+    }, registerCooldownMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [registerCooldownMs]);
+
+  const isRegisterCooldownActive = registerCooldownMs !== null;
 
   // Registration mutation
   const registerMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<CreatedRegistration> => {
       const response = await api.post('/registrations', { workshopId: id });
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-registrations'] });
-      queryClient.invalidateQueries({ queryKey: ['workshop', id] });
+    onSuccess: async (registration) => {
+      setApiError(null);
+      setRegisterCooldownMs(null);
+      await queryClient.invalidateQueries({ queryKey: ['my-registrations'] });
+      await queryClient.invalidateQueries({ queryKey: ['workshop', id] });
+
+      if (registration.status === 'PENDING_PAYMENT') {
+        const checkoutResponse = await api.post<PaymentCheckout>(`/registrations/${registration.id}/payment/checkout`, null, {
+          headers: {
+            'Idempotency-Key': getScopedIdempotencyKey(`payment-checkout:${registration.id}`),
+          },
+        });
+        clearScopedIdempotencyKey(`payment-checkout:${registration.id}`);
+        navigate(checkoutResponse.data.checkoutUrl);
+        return;
+      }
+
       navigate('/my-registrations');
     },
-    onError: (err: any) => {
-      const message = err.response?.data?.message || 'Failed to register for the workshop. Please try again.';
-      setError(message);
+    onError: (err: ApiError) => {
+      if (err.response?.status === 429) {
+        const retryAfterHeader = Number(err.response.headers?.['retry-after']);
+        const retryAfterSeconds = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
+          ? retryAfterHeader
+          : (err.response.data?.retryAfterSeconds || 3);
+        setRegisterCooldownMs(retryAfterSeconds * 1000);
+      }
+
+      setApiError(err);
     }
   });
 
@@ -104,7 +164,10 @@ const WorkshopDetails: React.FC = () => {
       navigate('/login', { state: { from: `/workshops/${id}` } });
       return;
     }
-    setError(null);
+    if (isRegisterCooldownActive) {
+      return;
+    }
+    setApiError(null);
     registerMutation.mutate();
   };
 
@@ -341,27 +404,16 @@ const WorkshopDetails: React.FC = () => {
                     </div>
                   </div>
 
-                  {error && (
-                    <div style={{ 
-                      padding: '16px', 
-                      background: '#FFF1F2', 
-                      color: 'var(--danger-color)', 
-                      borderRadius: 'var(--radius-md)', 
-                      fontSize: '14px', 
-                      marginBottom: '24px',
-                      display: 'flex',
-                      gap: '12px',
-                      alignItems: 'flex-start',
-                      border: '1px solid #FECDD3'
-                    }}>
-                      <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-                      <span>{error}</span>
-                    </div>
+                  {apiError && (
+                    <ApiErrorNotice
+                      error={apiError}
+                      className="workshop-registration-error"
+                    />
                   )}
 
                   <button 
                     onClick={handleRegister}
-                    disabled={registerMutation.isPending || isFull || isExpired || isNotYetOpen || (isAuthenticated && !user?.roles?.includes('STUDENT'))}
+                    disabled={registerMutation.isPending || isRegisterCooldownActive || isFull || isExpired || isNotYetOpen || (isAuthenticated && !user?.roles?.includes('STUDENT'))}
                     className={`btn btn-primary ${registerMutation.isPending ? 'loading' : ''}`}
                     style={{ 
                       width: '100%', 

@@ -35,7 +35,13 @@ INSERT INTO students (id, user_id, student_code, full_name, email, faculty, majo
     ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002', '22110002', 'Student Two', 'student2@unihub.local', 'CNTT', 'Ky thuat phan mem', 'K22', 'ACTIVE', 'sample_students_500.csv', 2);
 
 INSERT INTO events (id, name, start_date, end_date, status) VALUES
-    ('30000000-0000-0000-0000-000000000001', 'Tuan le ky nang va nghe nghiep 2026', DATE '2026-06-01', DATE '2026-06-07', 'ACTIVE');
+    (
+        '30000000-0000-0000-0000-000000000001',
+        'Tuan le ky nang va nghe nghiep 2026',
+        ((NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date + 8),
+        ((NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date + 9),
+        'ACTIVE'
+    );
 
 INSERT INTO rooms (id, name, building, floor, capacity, layout_image_url) VALUES
     ('31000000-0000-0000-0000-000000000001', 'A101', 'Toa A', '1', 120, '/layouts/a101.png'),
@@ -64,10 +70,10 @@ INSERT INTO workshops (
         0,
         'VND',
         'PUBLISHED',
-        TIMESTAMPTZ '2026-06-02 08:00:00+07',
-        TIMESTAMPTZ '2026-06-02 10:00:00+07',
-        TIMESTAMPTZ '2026-05-20 08:00:00+07',
-        TIMESTAMPTZ '2026-06-02 07:30:00+07',
+        (DATE_TRUNC('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') + INTERVAL '8 days 8 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh',
+        (DATE_TRUNC('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') + INTERVAL '8 days 10 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh',
+        (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh' - INTERVAL '1 day') AT TIME ZONE 'Asia/Ho_Chi_Minh',
+        (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh' + INTERVAL '7 days') AT TIME ZONE 'Asia/Ho_Chi_Minh',
         '10000000-0000-0000-0000-000000000003',
         '10000000-0000-0000-0000-000000000003'
     ),
@@ -81,10 +87,10 @@ INSERT INTO workshops (
         50000,
         'VND',
         'PUBLISHED',
-        TIMESTAMPTZ '2026-06-03 13:30:00+07',
-        TIMESTAMPTZ '2026-06-03 16:00:00+07',
-        TIMESTAMPTZ '2026-05-20 08:00:00+07',
-        TIMESTAMPTZ '2026-06-03 13:00:00+07',
+        (DATE_TRUNC('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') + INTERVAL '9 days 13 hours 30 minutes') AT TIME ZONE 'Asia/Ho_Chi_Minh',
+        (DATE_TRUNC('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') + INTERVAL '9 days 16 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh',
+        (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh' - INTERVAL '1 day') AT TIME ZONE 'Asia/Ho_Chi_Minh',
+        (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh' + INTERVAL '7 days') AT TIME ZONE 'Asia/Ho_Chi_Minh',
         '10000000-0000-0000-0000-000000000003',
         '10000000-0000-0000-0000-000000000003'
     );

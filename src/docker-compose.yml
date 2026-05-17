@@ -57,12 +57,14 @@ services:
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
       SERVER_PORT: 8080
       CSV_SYNC_DIR: /app/data/csv
+      AI_DOCS_DIR: /app/data/documents
       MAIL_HOST: ${MAIL_HOST}
       MAIL_PORT: ${MAIL_PORT}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
     volumes:
       - ./data/csv:/app/data/csv
+      - ./data/documents:/app/data/documents
     ports:
       - "8080:8080"
     restart: unless-stopped

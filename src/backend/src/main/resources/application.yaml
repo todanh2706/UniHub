@@ -44,6 +44,12 @@ application:
       secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
       expiration: ${JWT_EXPIRATION:86400000} # 1 day
   rate-limit:
+    # Local dev defaults: only trust forwarded headers from loopback proxies.
+    # In production, replace/extend this list with your ingress or reverse-proxy IPs.
+    trusted-proxies:
+      - 127.0.0.1
+      - ::1
+      - 0:0:0:0:0:0:0:1
     policies:
       - scope: IP
         endpoint: POST:/api/v1/registrations

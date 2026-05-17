@@ -9,7 +9,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import vn.unihub.backend.circuitbreaker.CircuitBreakerService;
+import vn.unihub.backend.dto.payment.MockProviderActionRequest;
+import vn.unihub.backend.dto.payment.MockProviderResultResponse;
+import vn.unihub.backend.dto.payment.MockProviderSessionResponse;
+import vn.unihub.backend.dto.payment.PaymentCheckoutResponse;
+import vn.unihub.backend.dto.payment.PaymentStatusResponse;
 import vn.unihub.backend.dto.registration.CancelRegistrationResponse;
 import vn.unihub.backend.dto.registration.OrganizerRegistrationSummaryResponse;
 import vn.unihub.backend.dto.registration.RegistrationResponse;
@@ -22,6 +26,7 @@ import vn.unihub.backend.entity.payment.Payment;
 import vn.unihub.backend.entity.registration.Registration;
 import vn.unihub.backend.entity.student.Student;
 import vn.unihub.backend.idempotency.IdempotencyService;
+import vn.unihub.backend.exception.IdempotencyConflictException;
 import vn.unihub.backend.payment.PaymentService;
 import vn.unihub.backend.repository.PaymentRepository;
 import vn.unihub.backend.repository.catalog.WorkshopRepository;
@@ -32,6 +37,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -121,14 +127,19 @@ public class RegistrationService {
 
         // Idempotency check
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            // Check if already completed
-            String cached = idempotencyService.getCachedResponse(idempotencyKey);
-            if (cached != null && !"IN_PROGRESS".equals(cached)) {
-                try {
-                    return objectMapper.readValue(cached, RegistrationResponse.class);
-                } catch (Exception e) {
-                    log.warn("Failed to replay idempotent response for key: {}", idempotencyKey);
+            try {
+                IdempotencyService.CachedResult cachedResult = idempotencyService.getCachedResult(
+                        idempotencyKey,
+                        "/api/v1/registrations",
+                        workshopId.toString()
+                );
+                if (cachedResult != null) {
+                    return objectMapper.readValue(cachedResult.responseBody(), RegistrationResponse.class);
                 }
+            } catch (IdempotencyConflictException e) {
+                throw e;
+            } catch (Exception e) {
+                log.warn("Failed to replay idempotent response for key: {}", idempotencyKey);
             }
         }
 
@@ -188,24 +199,9 @@ public class RegistrationService {
             notificationService.sendRegistrationConfirmation(saved);
         }
 
-        // For paid workshops, initiate payment through circuit breaker
+        // For paid workshops, create or reuse a stable payment intent.
         if (isPaid) {
-            try {
-                Payment payment = paymentService.initiatePayment(saved);
-                paymentRepository.save(payment);
-                
-                if ("SUCCEEDED".equals(payment.getStatus())) {
-                    saved.setStatus(STATUS_CONFIRMED);
-                    saved.setConfirmedAt(now);
-                    saved.setExpiresAt(null);
-                    saved = registrationRepository.save(saved);
-                    notificationService.sendRegistrationConfirmation(saved);
-                }
-            } catch (CircuitBreakerService.PaymentGatewayUnavailableException e) {
-                // Payment gateway unavailable - registration stays PENDING_PAYMENT
-                // Registration will expire in 15 minutes via worker
-                log.warn("Payment gateway unavailable for registration: {}", saved.getId());
-            }
+            paymentService.createOrReusePaymentIntent(saved);
         }
 
         RegistrationResponse response = toRegistrationResponse(saved);
@@ -229,10 +225,96 @@ public class RegistrationService {
 
     @Transactional(readOnly = true)
     public RegistrationResponse getMyRegistrationDetail(User user, UUID registrationId) {
-        Student student = resolveActiveStudent(user);
-        Registration registration = registrationRepository.findByIdAndStudentId(registrationId, student.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Registration not found"));
+        Registration registration = findOwnedRegistration(user, registrationId);
         return toRegistrationResponse(registration);
+    }
+
+    @Transactional
+    public PaymentCheckoutResponse openPaymentCheckout(User user, UUID registrationId) {
+        Registration registration = findPendingPaymentRegistration(user, registrationId);
+        Payment payment = paymentService.createOrReusePaymentIntent(registration);
+        return toPaymentCheckoutResponse(registration, payment);
+    }
+
+    @Transactional
+    public PaymentCheckoutResponse retryPayment(User user, UUID registrationId) {
+        Registration registration = findPendingPaymentRegistration(user, registrationId);
+        Payment payment = paymentService.createOrReusePaymentIntent(registration);
+        return toPaymentCheckoutResponse(registration, payment);
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentStatusResponse getPaymentStatus(User user, UUID registrationId) {
+        Registration registration = findOwnedRegistration(user, registrationId);
+        Payment payment = paymentService.getPaymentIntent(registration);
+        payment = paymentService.reconcilePendingPayment(payment);
+        return toPaymentStatusResponse(registration, payment);
+    }
+
+    @Transactional(readOnly = true)
+    public MockProviderSessionResponse getMockProviderSession(String checkoutToken) {
+        Payment payment = paymentService.getPaymentIntentByCheckoutToken(checkoutToken);
+        return new MockProviderSessionResponse(
+                payment.getRegistration().getId(),
+                payment.getRegistration().getWorkshop().getTitle(),
+                payment.getAmount(),
+                payment.getCurrency(),
+                payment.getStatus(),
+                payment.getCheckoutToken()
+        );
+    }
+
+    @Transactional
+    public MockProviderResultResponse applyMockProviderOutcome(String checkoutToken,
+                                                              MockProviderActionRequest request) {
+        Payment payment = paymentService.getPaymentIntentByCheckoutToken(checkoutToken);
+        Registration registration = payment.getRegistration();
+        String outcome = request.outcome() == null ? "" : request.outcome().trim().toUpperCase(Locale.ROOT);
+
+        if (paymentService.isSuccessful(payment) || STATUS_CONFIRMED.equals(registration.getStatus())) {
+            return new MockProviderResultResponse(
+                    registration.getId(),
+                    STATUS_CONFIRMED,
+                    PaymentService.PAYMENT_STATUS_SUCCEEDED,
+                    "/my-registrations"
+            );
+        }
+        if (STATUS_CANCELLED.equals(registration.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Registration was cancelled before payment completed");
+        }
+
+        switch (outcome) {
+            case "SUCCESS" -> {
+                payment.setStatus(PaymentService.PAYMENT_STATUS_SUCCEEDED);
+                payment.setLastErrorMessage(null);
+                if (payment.getProviderTransactionId() == null || payment.getProviderTransactionId().isBlank()) {
+                    payment.setProviderTransactionId("TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
+                }
+                payment.setPaidAt(Instant.now());
+                registration.setStatus(STATUS_CONFIRMED);
+                registration.setConfirmedAt(Instant.now());
+                registration.setExpiresAt(null);
+                registrationRepository.save(registration);
+                notificationService.sendRegistrationConfirmation(registration);
+            }
+            case "FAIL" -> {
+                payment.setStatus(PaymentService.PAYMENT_STATUS_FAILED);
+                payment.setLastErrorMessage("Mock provider rejected the payment");
+            }
+            case "TIMEOUT" -> {
+                payment.setStatus(PaymentService.PAYMENT_STATUS_PENDING);
+                payment.setLastErrorMessage("Mock provider timed out while processing payment");
+            }
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported mock payment outcome");
+        }
+
+        paymentRepository.save(payment);
+        return new MockProviderResultResponse(
+                registration.getId(),
+                registration.getStatus(),
+                payment.getStatus(),
+                "/my-registrations"
+        );
     }
 
     /**
@@ -265,9 +347,7 @@ public class RegistrationService {
 
     @Transactional
     public CancelRegistrationResponse cancelMyRegistration(User user, UUID registrationId) {
-        Student student = resolveActiveStudent(user);
-        Registration registration = registrationRepository.findByIdAndStudentId(registrationId, student.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Registration not found"));
+        Registration registration = findOwnedRegistration(user, registrationId);
 
         if (!ACTIVE_STATUSES.contains(registration.getStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Registration is not active");
@@ -333,6 +413,23 @@ public class RegistrationService {
         );
     }
 
+    private Registration findOwnedRegistration(User user, UUID registrationId) {
+        Student student = resolveActiveStudent(user);
+        return registrationRepository.findByIdAndStudentId(registrationId, student.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Registration not found"));
+    }
+
+    private Registration findPendingPaymentRegistration(User user, UUID registrationId) {
+        Registration registration = findOwnedRegistration(user, registrationId);
+        if (!STATUS_PENDING_PAYMENT.equals(registration.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Registration is not awaiting payment");
+        }
+        if (registration.getExpiresAt() != null && registration.getExpiresAt().isBefore(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment window has expired");
+        }
+        return registration;
+    }
+
     private Student resolveActiveStudent(User user) {
         return studentRepository.findByUserId(user.getId())
                 .orElseGet(() -> {
@@ -371,6 +468,12 @@ public class RegistrationService {
 
     private RegistrationResponse toRegistrationResponse(Registration registration) {
         String payload = "/api/v1/checkins/qr/" + registration.getQrToken();
+        Payment payment = paymentService.getPaymentIntent(registration);
+        boolean pendingRegistration = STATUS_PENDING_PAYMENT.equals(registration.getStatus());
+        boolean canOpenCheckout = pendingRegistration && (payment == null || paymentService.canReopenCheckout(payment));
+        boolean canRetryPayment = payment != null && canOpenCheckout && paymentService.isRetryableStatus(payment.getStatus());
+        boolean canCheckPaymentStatus = pendingRegistration && (payment == null || !paymentService.isSuccessful(payment));
+
         return new RegistrationResponse(
                 registration.getId(),
                 registration.getWorkshop().getId(),
@@ -382,7 +485,63 @@ public class RegistrationService {
                 registration.getConfirmedAt(),
                 registration.getCancelledAt(),
                 registration.getWorkshop().getStartTime(),
-                registration.getWorkshop().getEndTime()
+                registration.getWorkshop().getEndTime(),
+                payment != null ? payment.getStatus() : null,
+                registration.getExpiresAt(),
+                canOpenCheckout,
+                canRetryPayment,
+                canCheckPaymentStatus
+        );
+    }
+
+    private PaymentCheckoutResponse toPaymentCheckoutResponse(Registration registration, Payment payment) {
+        return new PaymentCheckoutResponse(
+                registration.getId(),
+                payment.getId(),
+                registration.getStatus(),
+                payment.getStatus(),
+                payment.getCheckoutToken(),
+                paymentService.buildMockCheckoutUrl(payment.getCheckoutToken()),
+                registration.getExpiresAt(),
+                payment.getRequestedAt()
+        );
+    }
+
+    private PaymentStatusResponse toPaymentStatusResponse(Registration registration, Payment payment) {
+        if (payment == null) {
+            return new PaymentStatusResponse(
+                    registration.getId(),
+                    null,
+                    registration.getStatus(),
+                    null,
+                    null,
+                    null,
+                    registration.getExpiresAt(),
+                    null,
+                    null,
+                    STATUS_PENDING_PAYMENT.equals(registration.getStatus()),
+                    false,
+                    STATUS_PENDING_PAYMENT.equals(registration.getStatus())
+            );
+        }
+
+        boolean pendingRegistration = STATUS_PENDING_PAYMENT.equals(registration.getStatus());
+        boolean canOpenCheckout = pendingRegistration && paymentService.canReopenCheckout(payment);
+        boolean canRetry = canOpenCheckout && paymentService.isRetryableStatus(payment.getStatus());
+        boolean canCheckStatus = pendingRegistration && !paymentService.isSuccessful(payment);
+        return new PaymentStatusResponse(
+                registration.getId(),
+                payment.getId(),
+                registration.getStatus(),
+                payment.getStatus(),
+                payment.getCheckoutToken(),
+                paymentService.buildMockCheckoutUrl(payment.getCheckoutToken()),
+                registration.getExpiresAt(),
+                payment.getRequestedAt(),
+                payment.getPaidAt(),
+                canOpenCheckout,
+                canRetry,
+                canCheckStatus
         );
     }
 

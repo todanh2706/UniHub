@@ -1,7 +1,7 @@
 package vn.unihub.backend.idempotency;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -16,6 +16,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -31,6 +32,7 @@ public class IdempotencyService {
         this.repository = repository;
         this.redisTemplate = redisTemplate;
         this.objectMapper = new ObjectMapper();
+        this.objectMapper.registerModule(new JavaTimeModule());
     }
 
     private static final String REDIS_PREFIX = "idem:";
@@ -42,16 +44,16 @@ public class IdempotencyService {
      */
     @Transactional
     public void reserve(String key, User user, String endpoint, String requestBody) {
-        String requestHash = hashBody(requestBody);
+        String requestHash = buildRequestFingerprint(endpoint, requestBody);
+        Optional<IdempotencyKey> existing = repository.findByKey(key);
 
         // Check Redis cache first
         String cached = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
         if (cached != null) {
-            handleExistingKey(key, requestHash, cached);
+            handleExistingKey(requestHash, cached, existing);
         }
 
         // Check PostgreSQL
-        var existing = repository.findByKey(key);
         if (existing.isPresent()) {
             IdempotencyKey existingKey = existing.get();
             if (existingKey.getRequestHash().equals(requestHash)) {
@@ -77,7 +79,7 @@ public class IdempotencyService {
                 .user(user)
                 .endpoint(endpoint)
                 .requestHash(requestHash)
-                .responseBody(null) // Use null for in-progress instead of invalid JSON string
+                .responseBody(null)
                 .statusCode(202)
                 .expiresAt(Instant.now().plusSeconds(TTL_SECONDS))
                 .build();
@@ -101,9 +103,22 @@ public class IdempotencyService {
                 idemKey.setResponseBody(responseJson);
                 idemKey.setStatusCode(statusCode);
                 repository.save(idemKey);
+
+                CachedResponseEnvelope envelope = new CachedResponseEnvelope(
+                        idemKey.getRequestHash(),
+                        statusCode,
+                        responseJson
+                );
+                redisTemplate.opsForValue().set(
+                        REDIS_PREFIX + key,
+                        objectMapper.writeValueAsString(envelope),
+                        TTL_SECONDS,
+                        TimeUnit.SECONDS
+                );
+                return;
             }
 
-            // Update Redis cache
+            // Fallback for unexpected missing DB row
             redisTemplate.opsForValue().set(REDIS_PREFIX + key, responseJson, TTL_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
             log.error("Failed to complete idempotency key: {}", key, e);
@@ -119,19 +134,48 @@ public class IdempotencyService {
     }
 
     /**
-     * Get a previously completed response.
+     * Get a previously completed response body only.
      */
     public String getCachedResponse(String key) {
+        CachedResult cachedResult = getCachedResult(key, null, null);
+        return cachedResult != null ? cachedResult.responseBody() : null;
+    }
+
+    /**
+     * Get a previously completed response with request fingerprint validation.
+     */
+    public CachedResult getCachedResult(String key, String endpoint, String requestBody) {
+        String expectedRequestHash = endpoint == null ? null : buildRequestFingerprint(endpoint, requestBody);
+        Optional<IdempotencyKey> existing = repository.findByKey(key);
+
         // Try Redis first
         String cached = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
         if (cached != null) {
-            return cached;
+            if ("IN_PROGRESS".equals(cached)) {
+                return null;
+            }
+
+            CachedResponseEnvelope envelope = parseEnvelope(cached);
+            if (envelope != null) {
+                return new CachedResult(envelope.responseBody(), envelope.statusCode());
+            }
         }
 
         // Fallback to PostgreSQL
-        return repository.findByKey(key)
-                .map(IdempotencyKey::getResponseBody)
-                .orElse(null);
+        return existing
+                .map(idemKey -> {
+                    validateRequestHash(expectedRequestHash, idemKey.getRequestHash());
+                    if (idemKey.getResponseBody() == null) {
+                        return null;
+                    }
+                    return new CachedResult(
+                            idemKey.getResponseBody(),
+                            idemKey.getStatusCode() != null ? idemKey.getStatusCode() : 200
+                    );
+                })
+                .orElseGet(() -> cached == null || "IN_PROGRESS".equals(cached)
+                        ? null
+                        : new CachedResult(cached, 200));
     }
 
     /**
@@ -142,21 +186,51 @@ public class IdempotencyService {
         if ("IN_PROGRESS".equals(cached)) {
             return true;
         }
-        
+
         // If not in Redis, check DB
         return repository.findByKey(key)
                 .map(k -> k.getResponseBody() == null)
                 .orElse(false);
     }
 
-    private void handleExistingKey(String key, String requestHash, String cachedResponse) {
+    public String buildRequestFingerprint(String endpoint, String requestBody) {
+        return hashBody((endpoint == null ? "" : endpoint) + "\n" + (requestBody == null ? "empty" : requestBody));
+    }
+
+    private void handleExistingKey(String requestHash, String cachedResponse,
+                                   Optional<IdempotencyKey> existingKey) {
         if ("IN_PROGRESS".equals(cachedResponse)) {
             throw new IdempotencyConflictException(
                     "Yeu cau truoc do voi Idempotency-Key nay van dang duoc xu ly.",
                     IdempotencyConflictException.ConflictType.REQUEST_IN_PROGRESS
             );
         }
-        // Response is cached - will be replayed by filter
+
+        CachedResponseEnvelope envelope = parseEnvelope(cachedResponse);
+        if (envelope != null) {
+            validateRequestHash(requestHash, envelope.requestHash());
+            return;
+        }
+
+        existingKey.ifPresent(idemKey -> validateRequestHash(requestHash, idemKey.getRequestHash()));
+        // Legacy cached JSON without envelope: rely on DB request hash if present.
+    }
+
+    private void validateRequestHash(String expectedRequestHash, String actualRequestHash) {
+        if (expectedRequestHash != null && !expectedRequestHash.equals(actualRequestHash)) {
+            throw new IdempotencyConflictException(
+                    "Idempotency-Key nay da duoc dung cho mot request khac.",
+                    IdempotencyConflictException.ConflictType.KEY_REUSED_WITH_DIFFERENT_REQUEST
+            );
+        }
+    }
+
+    private CachedResponseEnvelope parseEnvelope(String cachedResponse) {
+        try {
+            return objectMapper.readValue(cachedResponse, CachedResponseEnvelope.class);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private String hashBody(String body) {
@@ -168,5 +242,11 @@ public class IdempotencyService {
         } catch (NoSuchAlgorithmException e) {
             return Integer.toHexString(body.hashCode());
         }
+    }
+
+    public record CachedResult(String responseBody, int statusCode) {
+    }
+
+    private record CachedResponseEnvelope(String requestHash, int statusCode, String responseBody) {
     }
 }

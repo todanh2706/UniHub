@@ -16,8 +16,8 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import api from '../../api/axios';
+import { Link, useNavigate } from 'react-router-dom';
+import api, { clearScopedIdempotencyKey, getScopedIdempotencyKey } from '../../api/axios';
 import '../../styles/Skeleton.css';
 
 interface Registration {
@@ -32,6 +32,27 @@ interface Registration {
   cancelledAt: string | null;
   workshopStartTime: string;
   workshopEndTime: string;
+  paymentStatus: string | null;
+  paymentExpiresAt: string | null;
+  canOpenPaymentCheckout: boolean;
+  canRetryPayment: boolean;
+  canCheckPaymentStatus: boolean;
+}
+
+interface PaymentCheckoutResponse {
+  registrationId: string;
+  checkoutUrl: string;
+  paymentStatus: string;
+}
+
+interface PaymentStatusResponse {
+  registrationId: string;
+  registrationStatus: Registration['status'];
+  paymentStatus: string | null;
+  expiresAt: string | null;
+  canOpenCheckout: boolean;
+  canRetry: boolean;
+  canCheckStatus: boolean;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
@@ -83,6 +104,7 @@ function isActive(status: string) {
 }
 
 const MyRegistrations = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedReg, setSelectedReg] = useState<Registration | null>(null);
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
@@ -98,6 +120,63 @@ const MyRegistrations = () => {
     queryFn: async () => {
       const res = await api.get('/registrations/me');
       return res.data;
+    },
+  });
+
+  const syncPaymentState = (paymentState: PaymentStatusResponse) => {
+    setSelectedReg((prev) => prev && prev.id === paymentState.registrationId
+      ? {
+          ...prev,
+          status: paymentState.registrationStatus,
+          paymentStatus: paymentState.paymentStatus,
+          paymentExpiresAt: paymentState.expiresAt,
+          canOpenPaymentCheckout: paymentState.canOpenCheckout,
+          canRetryPayment: paymentState.canRetry,
+          canCheckPaymentStatus: paymentState.canCheckStatus,
+        }
+      : prev);
+  };
+
+  const openCheckoutMutation = useMutation({
+    mutationFn: async (registrationId: string) => {
+      const response = await api.post<PaymentCheckoutResponse>(`/registrations/${registrationId}/payment/checkout`, null, {
+        headers: {
+          'Idempotency-Key': getScopedIdempotencyKey(`payment-checkout:${registrationId}`),
+        },
+      });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      clearScopedIdempotencyKey(`payment-checkout:${data.registrationId}`);
+      queryClient.invalidateQueries({ queryKey: ['my-registrations'] });
+      navigate(data.checkoutUrl);
+    },
+  });
+
+  const retryPaymentMutation = useMutation({
+    mutationFn: async (registrationId: string) => {
+      const response = await api.post<PaymentCheckoutResponse>(`/registrations/${registrationId}/payment/retry`, null, {
+        headers: {
+          'Idempotency-Key': getScopedIdempotencyKey(`payment-retry:${registrationId}`),
+        },
+      });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      clearScopedIdempotencyKey(`payment-retry:${data.registrationId}`);
+      queryClient.invalidateQueries({ queryKey: ['my-registrations'] });
+      navigate(data.checkoutUrl);
+    },
+  });
+
+  const checkPaymentStatusMutation = useMutation({
+    mutationFn: async (registrationId: string) => {
+      const response = await api.get<PaymentStatusResponse>(`/registrations/${registrationId}/payment/status`);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['my-registrations'] });
+      syncPaymentState(data);
     },
   });
 
@@ -349,7 +428,30 @@ const MyRegistrations = () => {
                   </div>
 
                   {active && (
-                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      {reg.status === 'PENDING_PAYMENT' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedReg(reg);
+                          }}
+                          className="btn"
+                          style={{
+                            background: '#FFF7ED',
+                            color: '#C2410C',
+                            border: '1px solid #FED7AA',
+                            padding: '6px 14px',
+                            fontSize: '13px',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <ExternalLink size={14} /> Payment Actions
+                        </button>
+                      )}
                       {cancelConfirmId === reg.id ? (
                         <div
                           style={{ display: 'flex', gap: '8px' }}
@@ -663,6 +765,94 @@ const MyRegistrations = () => {
                     />
                   </div>
                 </div>
+
+                {selectedReg.status === 'PENDING_PAYMENT' && (
+                  <div
+                    style={{
+                      background: '#FFF7ED',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '20px',
+                      border: '1px solid #FED7AA',
+                      marginBottom: '24px',
+                    }}
+                  >
+                    <h4 style={{ fontSize: '15px', fontWeight: '600', color: '#9A3412', marginBottom: '8px' }}>
+                      Payment Actions
+                    </h4>
+                    <p style={{ fontSize: '13px', color: '#9A3412', marginBottom: '14px', lineHeight: '1.5' }}>
+                      Complete or recover your payment before the seat hold expires.
+                    </p>
+                    {selectedReg.paymentStatus && (
+                      <div style={{ fontSize: '13px', color: '#7C2D12', marginBottom: '8px' }}>
+                        Current payment status: <strong>{selectedReg.paymentStatus}</strong>
+                      </div>
+                    )}
+                    {selectedReg.paymentExpiresAt && (
+                      <div style={{ fontSize: '13px', color: '#7C2D12', marginBottom: '16px' }}>
+                        Hold expires at {new Date(selectedReg.paymentExpiresAt).toLocaleString()}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                      {selectedReg.canOpenPaymentCheckout && (
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => openCheckoutMutation.mutate(selectedReg.id)}
+                          disabled={openCheckoutMutation.isPending || retryPaymentMutation.isPending || checkPaymentStatusMutation.isPending}
+                          style={{
+                            background: 'var(--primary-color)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 18px',
+                            fontSize: '14px',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {openCheckoutMutation.isPending ? 'Opening Checkout...' : 'Pay Now'}
+                        </button>
+                      )}
+                      {selectedReg.canRetryPayment && (
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => retryPaymentMutation.mutate(selectedReg.id)}
+                          disabled={openCheckoutMutation.isPending || retryPaymentMutation.isPending || checkPaymentStatusMutation.isPending}
+                          style={{
+                            background: 'white',
+                            color: '#9A3412',
+                            border: '1px solid #FDBA74',
+                            padding: '10px 18px',
+                            fontSize: '14px',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {retryPaymentMutation.isPending ? 'Retrying...' : 'Retry Payment'}
+                        </button>
+                      )}
+                      {selectedReg.canCheckPaymentStatus && (
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => checkPaymentStatusMutation.mutate(selectedReg.id)}
+                          disabled={openCheckoutMutation.isPending || retryPaymentMutation.isPending || checkPaymentStatusMutation.isPending}
+                          style={{
+                            background: 'white',
+                            color: 'var(--text-body)',
+                            border: '1px solid var(--neutral-300)',
+                            padding: '10px 18px',
+                            fontSize: '14px',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {checkPaymentStatusMutation.isPending ? 'Checking...' : 'Check Payment Status'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* QR Code Card */}
                 {selectedReg.status === 'CONFIRMED' && (

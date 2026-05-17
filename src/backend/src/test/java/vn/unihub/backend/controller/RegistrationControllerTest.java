@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import vn.unihub.backend.entity.audit.RateLimitPolicy;
 import vn.unihub.backend.entity.auth.Role;
 import vn.unihub.backend.entity.auth.User;
 import vn.unihub.backend.entity.auth.UserRole;
@@ -170,6 +171,25 @@ class RegistrationControllerTest {
                                 .confirmedAt(now)
                                 .build());
 
+                entityManager.persist(RateLimitPolicy.builder()
+                                .scope("USER")
+                                .endpoint("/api/v1/registrations")
+                                .roleCode("STUDENT")
+                                .limitValue(20)
+                                .windowSeconds(3)
+                                .algorithm("TOKEN_BUCKET")
+                                .enabled(true)
+                                .build());
+                entityManager.persist(RateLimitPolicy.builder()
+                                .scope("IP")
+                                .endpoint("/api/v1/registrations")
+                                .roleCode(null)
+                                .limitValue(500)
+                                .windowSeconds(60)
+                                .algorithm("TOKEN_BUCKET")
+                                .enabled(true)
+                                .build());
+
                 entityManager.flush();
                 entityManager.clear();
         }
@@ -189,19 +209,22 @@ class RegistrationControllerTest {
                                 .with(httpBasic("student1@unihub.local", "secret"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
-                                .andExpect(status().isOk())
+                                .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                                 .andExpect(jsonPath("$.workshopId").value(freeWorkshop.getId().toString()));
         }
 
         @Test
-        void createRegistration_paidWorkshop_rejected() throws Exception {
+        void createRegistration_paidWorkshop_createsPendingPayment() throws Exception {
                 String body = objectMapper.writeValueAsString(new Request(paidWorkshop.getId()));
                 mockMvc.perform(post("/api/v1/registrations")
                                 .with(httpBasic("student1@unihub.local", "secret"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.status").value("PENDING_PAYMENT"))
+                                .andExpect(jsonPath("$.paymentStatus").value("CHECKOUT_READY"))
+                                .andExpect(jsonPath("$.canOpenPaymentCheckout").value(true));
         }
 
         @Test
@@ -212,6 +235,71 @@ class RegistrationControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                                 .andExpect(status().isConflict());
+        }
+
+        @Test
+        void createRegistration_rateLimitPolicyFromDb_appliesToRegistrationEndpoint() throws Exception {
+                String body = objectMapper.writeValueAsString(new Request(freeWorkshop.getId()));
+
+                for (int attempt = 0; attempt < 20; attempt++) {
+                        mockMvc.perform(post("/api/v1/registrations")
+                                        .with(httpBasic("student1@unihub.local", "secret"))
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(body))
+                                        .andExpect(status().isIn(new int[] { 201, 409 }));
+                }
+
+                mockMvc.perform(post("/api/v1/registrations")
+                                .with(httpBasic("student1@unihub.local", "secret"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                                .andExpect(status().isTooManyRequests())
+                                .andExpect(jsonPath("$.error").value("RATE_LIMITED"))
+                                .andExpect(jsonPath("$.retryAfterSeconds").value(1));
+        }
+
+        @Test
+        void createRegistration_sameIdempotencyKey_replaysCreatedResponse() throws Exception {
+                String body = objectMapper.writeValueAsString(new Request(freeWorkshop.getId()));
+                String idempotencyKey = "idem-test-registration-1";
+
+                mockMvc.perform(post("/api/v1/registrations")
+                                .with(httpBasic("student1@unihub.local", "secret"))
+                                .header("Idempotency-Key", idempotencyKey)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+                mockMvc.perform(post("/api/v1/registrations")
+                                .with(httpBasic("student1@unihub.local", "secret"))
+                                .header("Idempotency-Key", idempotencyKey)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+        }
+
+        @Test
+        void createRegistration_sameIdempotencyKeyDifferentRequest_rejected() throws Exception {
+                String idempotencyKey = "idem-test-registration-2";
+                String body1 = objectMapper.writeValueAsString(new Request(freeWorkshop.getId()));
+                String body2 = objectMapper.writeValueAsString(new Request(paidWorkshop.getId()));
+
+                mockMvc.perform(post("/api/v1/registrations")
+                                .with(httpBasic("student1@unihub.local", "secret"))
+                                .header("Idempotency-Key", idempotencyKey)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body1))
+                                .andExpect(status().isCreated());
+
+                mockMvc.perform(post("/api/v1/registrations")
+                                .with(httpBasic("student1@unihub.local", "secret"))
+                                .header("Idempotency-Key", idempotencyKey)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body2))
+                                .andExpect(status().isConflict())
+                                .andExpect(jsonPath("$.error").value("IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST"));
         }
 
         @Test
@@ -288,6 +376,7 @@ class RegistrationControllerTest {
                 entityManager.createQuery("delete from UserRole").executeUpdate();
                 entityManager.createQuery("delete from Role").executeUpdate();
                 entityManager.createQuery("delete from User").executeUpdate();
+                entityManager.createQuery("delete from RateLimitPolicy").executeUpdate();
                 entityManager.flush();
         }
 
