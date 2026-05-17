@@ -83,7 +83,7 @@ Các thành phần cốt lõi của kiến trúc bao gồm:
   - **Mật khẩu băm an toàn (BCrypt Password Hashing):** Sử dụng thuật toán băm mạnh `BCryptPasswordEncoder` để mã hóa mật khẩu trước khi lưu xuống cơ sở dữ liệu. Hệ thống tuyệt đối không lưu trữ mật khẩu dưới dạng văn bản thuần túy (plain text).
   - **Kiến trúc Stateless (Stateless JWT Session):** Thiết lập `SessionCreationPolicy.STATELESS` đảm bảo server không lưu trạng thái phiên làm việc (session state) của người dùng. Điều này tối ưu hóa khả năng mở rộng (scale) của hệ thống và loại bỏ nguy cơ tấn công chiếm quyền điều khiển phiên (Session Hijacking).
   - **Quản lý Vòng đời Refresh Token chặt chẽ:** Refresh Token được định danh ngẫu nhiên bằng chuỗi UUID v4 thay vì chứa thông tin người dùng trực tiếp để tránh rò rỉ dữ liệu. Các token này được quản lý thời gian hết hạn và hỗ trợ cơ chế thu hồi lập tức (`revoked_at`) khi người dùng bấm Đăng xuất (`logout`), vô hiệu hóa hoàn toàn khả năng sử dụng lại token cũ.
-  - **Bảo vệ bằng CORS (Cross-Origin Resource Sharing):** Định cấu hình danh sách nguồn cho phép (Allowed Origins) linh hoạt trong [SecurityConfig.java](file:///Users/todanh/Downloads/UniHub/src/backend/src/main/java/vn/unihub/backend/security/SecurityConfig.java) bao gồm localhost, dải IP nội bộ và các tên miền ngrok, hỗ trợ tối đa việc kiểm thử ứng dụng di động qua thiết bị thật hoặc máy ảo một cách an toàn.
+  - **Bảo vệ bằng CORS (Cross-Origin Resource Sharing):** Định cấu hình danh sách nguồn cho phép (Allowed Origins) linh hoạt trong  bao gồm localhost, dải IP nội bộ và các tên miền ngrok, hỗ trợ tối đa việc kiểm thử ứng dụng di động qua thiết bị thật hoặc máy ảo một cách an toàn.
 
 - **Database Constraints:**
   - Bảng `users` định nghĩa ràng buộc `email VARCHAR(255) NOT NULL UNIQUE` đảm bảo không có hai tài khoản trùng email.
@@ -100,7 +100,7 @@ Các thành phần cốt lõi của kiến trúc bao gồm:
 ## 5. Tiêu chí chấp nhận (Acceptance Criteria)
 
 - [ ] AC1: Đảm bảo luồng đăng ký tài khoản tự động gán vai trò mặc định là `STUDENT` và tự động liên kết hoặc tạo mới hồ sơ thông tin sinh viên (`Student` profile entity).
-- [ ] AC2: Đảm bảo rằng mọi yêu cầu HTTP gửi đến API được bảo vệ (ngoại trừ các endpoint public được cấu hình tại [SecurityConfig.java](file:///Users/todanh/Downloads/UniHub/src/backend/src/main/java/vn/unihub/backend/security/SecurityConfig.java)) đều bắt buộc phải đính kèm Access Token hợp lệ, nếu không hệ thống phải trả về mã lỗi HTTP `401 Unauthorized`.
+- [ ] AC2: Đảm bảo rằng mọi yêu cầu HTTP gửi đến API được bảo vệ (ngoại trừ các endpoint public được cấu hình tại ) đều bắt buộc phải đính kèm Access Token hợp lệ, nếu không hệ thống phải trả về mã lỗi HTTP `401 Unauthorized`.
 - [ ] AC3: Đảm bảo cơ chế tự động làm mới mã thông báo (Silent Token Refresh) tại Axios Interceptor trên Client hoạt động trơn tru trong suốt quá trình người dùng sử dụng ứng dụng mà không gây gián đoạn hoặc yêu cầu người dùng phải thao tác lại trên màn hình khi Access Token hết hạn.
 - [ ] AC4: Hệ thống phải ngay lập tức vô hiệu hóa phiên làm việc của người dùng khi thực hiện hành động Đăng xuất (`logout`) bằng cách cập nhật trường `revoked_at` của Refresh Token tương ứng trong cơ sở dữ liệu PostgreSQL.
 - [ ] AC5: Đảm bảo bảo vệ mật khẩu tuyệt đối bằng cơ chế BCrypt và ngăn chặn hoàn toàn việc rò rỉ thông tin đăng nhập thông qua các phản hồi lỗi chung (ví dụ: hiển thị lỗi chung "Bad credentials" thay vì thông báo cụ thể "Mật khẩu không đúng" hay "Tài khoản không tồn tại").

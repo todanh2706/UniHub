@@ -17,23 +17,23 @@
 
 1. **Client (Web PWA / Mobile App):**
    - Client gửi một yêu cầu `POST /api/v1/payments` để thực hiện thanh toán cho đăng ký workshop.
-   - Yêu cầu đính kèm tiêu đề `Idempotency-Key` với giá trị UUID v4 được sinh tự động bởi Axios Interceptor tại [axios.ts](file:///Users/todanh/Downloads/UniHub/src/frontend/src/api/axios.ts) và đính kèm access token định danh người dùng.
+   - Yêu cầu đính kèm tiêu đề `Idempotency-Key` với giá trị UUID v4 được sinh tự động bởi Axios Interceptor tại  và đính kèm access token định danh người dùng.
 
 2. **Backend API (Bộ lọc và Xử lý nghiệp vụ):**
    - **Giai đoạn 1: Xác thực Idempotency (Idempotency Filter):**
-     - [IdempotencyFilter.java](file:///Users/todanh/Downloads/UniHub/src/backend/src/main/java/vn/unihub/backend/idempotency/IdempotencyFilter.java) tiếp nhận request, lấy ra giá trị `Idempotency-Key` từ header.
-     - [IdempotencyService.java](file:///Users/todanh/Downloads/UniHub/src/backend/src/main/java/vn/unihub/backend/idempotency/IdempotencyService.java) thực hiện tính toán hàm băm SHA-256 của Request Body.
+     -  tiếp nhận request, lấy ra giá trị `Idempotency-Key` từ header.
+     -  thực hiện tính toán hàm băm SHA-256 của Request Body.
      - Tra cứu trạng thái của khóa trên Redis trước. Nếu không có trong Redis, tra cứu tiếp trong Postgres.
      - Phát hiện đây là khóa mới hoàn toàn (chưa từng được sử dụng). Hệ thống tiến hành "Giữ chỗ" (Reserve) khóa này bằng cách chèn một dòng vào bảng `idempotency_keys` với trạng thái đang xử lý (`responseBody = null`, `statusCode = 202`), đồng thời ghi nhận giá trị `"IN_PROGRESS"` vào Redis với TTL là 1 giờ.
    - **Giai đoạn 2: Giới hạn Tần suất (Rate Limit Filter):**
-     - [RateLimitFilter.java](file:///Users/todanh/Downloads/UniHub/src/backend/src/main/java/vn/unihub/backend/ratelimit/RateLimitFilter.java) kiểm tra các cấu hình chính sách được nạp từ [application.yaml](file:///Users/todanh/Downloads/UniHub/src/backend/src/main/resources/application.yaml#L46-L72).
+     -  kiểm tra các cấu hình chính sách được nạp từ .
      - Định danh người dùng truy cập (`USER` scope) thông qua tên tài khoản đăng nhập (email) thu được từ Spring Security Context.
-     - Gọi [RateLimiterService.tryConsume()](file:///Users/todanh/Downloads/UniHub/src/backend/src/main/java/vn/unihub/backend/ratelimit/RateLimiterService.java) để thực thi script Lua nguyên tử trên Redis. Script thực hiện lấy bucket, tính toán số token tích lũy dựa trên thời gian trôi qua, và trừ đi 1 token.
+     - Gọi  để thực thi script Lua nguyên tử trên Redis. Script thực hiện lấy bucket, tính toán số token tích lũy dựa trên thời gian trôi qua, và trừ đi 1 token.
      - Token được tiêu thụ thành công (vẫn nằm trong giới hạn). Bộ lọc cho phép request tiếp tục đi vào Controller.
    - **Giai đoạn 3: Thực thi nghiệp vụ và Cầu chì bảo vệ (Circuit Breaker):**
-     - Controller định tuyến yêu cầu thanh toán đến [PaymentService.initiatePayment()](file:///Users/todanh/Downloads/UniHub/src/backend/src/main/java/vn/unihub/backend/payment/PaymentService.java).
-     - Hệ thống gọi API của cổng thanh toán thực tế thông qua [CircuitBreakerService.executeWithCircuitBreaker()](file:///Users/todanh/Downloads/UniHub/src/backend/src/main/java/vn/unihub/backend/circuitbreaker/CircuitBreakerService.java).
-     - [CircuitBreakerService](file:///Users/todanh/Downloads/UniHub/src/backend/src/main/java/vn/unihub/backend/circuitbreaker/CircuitBreakerService.java) kiểm tra trạng thái hiện tại của cầu chì là `CLOSED` (bình thường), tiến hành thực hiện cuộc gọi.
+     - Controller định tuyến yêu cầu thanh toán đến .
+     - Hệ thống gọi API của cổng thanh toán thực tế thông qua .
+     -  kiểm tra trạng thái hiện tại của cầu chì là `CLOSED` (bình thường), tiến hành thực hiện cuộc gọi.
      - Cổng thanh toán phản hồi thành công tức thì. Circuit Breaker ghi nhận một giao dịch thành công vào cửa sổ trượt (sliding window).
 
 3. **Database/Redis:**
